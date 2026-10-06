@@ -2,7 +2,6 @@ const fs = require("node:fs"),
   path = require("node:path"),
   os = require("node:os"),
   crypto = require("node:crypto");
-const { css, validate } = require("./profile.cjs");
 const { safeSnapshot } = require("./assets.cjs");
 const BEGIN = "\n/* quickcss:begin v1 */\n",
   END = "\n/* quickcss:end v1 */\n";
@@ -217,30 +216,6 @@ class Cache {
     atomic(filePath, updatedCSS, sourceCSS);
     return { changed: true, cache: path.basename(cacheDirectory) };
   }
-  apply(profile, label, version) {
-    const validatedProfile = validate(profile),
-      cssText = css(validatedProfile);
-    return this.locked(() => {
-      this.current();
-      atomic(
-        this.stateFile,
-        JSON.stringify(
-          {
-            schema: 1,
-            enabled: true,
-            profile: validatedProfile,
-            css: cssText,
-            label,
-            version,
-            appliedAt: new Date().toISOString(),
-          },
-          null,
-          2,
-        ),
-      );
-      return this.writeCurrent(cssText);
-    });
-  }
   applySnapshot(snapshot, label, version, ownerId) {
     if (
       snapshot?.schema !== 2 ||
@@ -297,10 +272,19 @@ class Cache {
       return true;
     });
   }
-  reconcile() {
+  reconcile(ownerId) {
+    const previousState = this.state();
+    if (!previousState.enabled) return { enabled: false };
+    if (ownerId && previousState.owner !== ownerId) return { skipped: true };
+    const current = this.current();
+    // Our own writes trigger filesystem notifications too. Checking before
+    // locking avoids both lock churn and an event/write feedback loop.
+    if (patch(current.source, previousState.css) === current.source)
+      return { changed: false, enabled: true };
     return this.locked(() => {
       const sharedState = this.state();
       if (!sharedState.enabled) return { enabled: false };
+      if (ownerId && sharedState.owner !== ownerId) return { skipped: true };
       return {
         ...this.writeCurrent(sharedState.css),
         enabled: true,

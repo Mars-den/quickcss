@@ -182,7 +182,7 @@ test("quit stops work before unload without any cache restore or new scheduling"
   p.owner = "A";
   p.beginShutdown();
   p.scheduleAppearance();
-  p.poll();
+  p.refreshStatus();
   p.apply(snapshot);
   assert.deepEqual(calls, ["stop", "disconnect", "abort", "hide"]);
   assert.equal(p.shuttingDown, true);

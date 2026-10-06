@@ -4,7 +4,7 @@ const { test } = require("node:test"),
   os = require("node:os"),
   path = require("node:path");
 const { Cache, patch, strip, atomic, BEGIN, END } = require("../src/cache.cjs");
-const { defaults, css } = require("../src/profile.cjs");
+const snapshot = { schema: 2, css: "body{font-size:16px}", theme: "Test" };
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "quickcss-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -47,7 +47,7 @@ test("malformed, unknown and duplicate markers fail closed", () => {
 test("apply retains original backup, makes no repeated CSS writes, preserves foreign edits on restore", (t) => {
   const { cache, base, generation } = fixture(t),
     file = generation("a");
-  cache.apply(defaults, "vault A", "1.14.4");
+  cache.applySnapshot(snapshot, "vault A", "1.14.4");
   const mtime = fs.statSync(file).mtimeMs;
   assert.equal(cache.reconcile().changed, false);
   assert.equal(fs.statSync(file).mtimeMs, mtime);
@@ -64,7 +64,11 @@ test("apply retains original backup, makes no repeated CSS writes, preserves for
 test("a second vault reconciles shared profile; replacements receive selected CSS", (t) => {
   const { cache, generation } = fixture(t);
   generation("a");
-  cache.apply({ ...defaults, size: 25 }, "vault A", "1.14.4");
+  cache.applySnapshot(
+    { ...snapshot, css: "body{font-size:25px}" },
+    "vault A",
+    "1.14.4",
+  );
   const other = new Cache(cache.root, cache.stateRoot);
   const file = generation("b");
   assert.equal(other.reconcile().changed, true);
@@ -76,7 +80,7 @@ test("unsupported renderer is refused without profile activation", (t) => {
   const { cache, generation } = fixture(t);
   const file = generation("a");
   fs.writeFileSync(path.join(path.dirname(file), "index.html"), "new renderer");
-  assert.throws(() => cache.apply(defaults, "A", "2"));
+  assert.throws(() => cache.applySnapshot(snapshot, "A", "2"));
   assert.equal(cache.state().enabled, false);
 });
 test("external symlink and resource symlink are rejected", (t) => {
@@ -89,9 +93,11 @@ test("external symlink and resource symlink are rejected", (t) => {
 test("concurrent lock blocks writes and leaves selected state intact", (t) => {
   const { cache, generation } = fixture(t);
   generation("a");
-  cache.apply(defaults, "A", "1");
+  cache.applySnapshot(snapshot, "A", "1");
   fs.writeFileSync(path.join(cache.stateRoot, "write.lock"), "another");
-  assert.throws(() => cache.apply({ ...defaults, size: 30 }, "B", "1"));
+  assert.throws(() =>
+    cache.applySnapshot({ ...snapshot, css: "body{font-size:30px}" }, "B", "1"),
+  );
   assert.equal(cache.state().label, "A");
 });
 test("compare before atomic write protects against intervening changes", (t) => {
@@ -103,23 +109,24 @@ test("compare before atomic write protects against intervening changes", (t) => 
 test("restore stops auto reapply even when a corrupted block prevents removal", (t) => {
   const { cache, generation } = fixture(t),
     file = generation("a");
-  cache.apply(defaults, "A", "1");
+  cache.applySnapshot(snapshot, "A", "1");
   fs.appendFileSync(file, BEGIN);
   assert.throws(() => cache.restore());
   assert.equal(cache.state().enabled, false);
   assert.equal(cache.reconcile().enabled, false);
 });
-test("profile constraints reject invalid values, imports and marker injection", () => {
-  for (const p of [
-    { size: NaN },
-    { size: 100 },
-    { font: "x;}" },
-    { accent: "red" },
-    { customCss: '@import "https://example.com";' },
-    { customCss: "/* quickcss:end */" },
+test("snapshot validation rejects invalid content before writing", (t) => {
+  const { cache, generation } = fixture(t);
+  generation("a");
+  for (const invalid of [
+    { schema: 1, css: "body{}" },
+    { schema: 2, css: null },
+    { schema: 2, css: "x".repeat(1000001) },
+    { schema: 2, css: '@import "https://example.com";' },
+    { schema: 2, css: "/* quickcss:end */" },
   ])
-    assert.throws(() => css({ ...defaults, ...p }));
-  assert.match(css(defaults), /theme-dark/);
+    assert.throws(() => cache.applySnapshot(invalid, "A", "1"));
+  assert.equal(cache.state().enabled, false);
 });
 
 test("dead process locks recover, including legacy PID-only locks", (t) => {
@@ -243,4 +250,37 @@ test("legacy and invalid timestamps use lock modification time for expiry", (t) 
     cache.claim("A", "A");
     assert.equal(fs.existsSync(lock), false);
   }
+});
+
+test("unchanged, disabled and foreign-owner reconciliation takes no write lock", (t) => {
+  const { cache, generation } = fixture(t);
+  const file = generation("a");
+  cache.claim("A", "A");
+  cache.applySnapshot(snapshot, "A", "1", "A");
+  const locked = cache.locked;
+  cache.locked = () => assert.fail("unnecessary write lock");
+  assert.equal(cache.reconcile("A").changed, false);
+  fs.writeFileSync(file, "body{--font-text-size:16px}.markdown-rendered{}");
+  assert.equal(cache.reconcile("B").skipped, true);
+  cache.locked = locked;
+  cache.restore("A");
+  cache.locked = () => assert.fail("disabled reconciliation took a lock");
+  assert.equal(cache.reconcile("A").enabled, false);
+});
+
+test("ownership changes between reconciliation and lock acquisition prevent stale repairs", (t) => {
+  const { cache, generation } = fixture(t);
+  generation("a");
+  cache.claim("A", "A");
+  cache.applySnapshot(snapshot, "A", "1", "A");
+  const file = generation("b");
+  const bytes = fs.readFileSync(file, "utf8");
+  const locked = cache.locked.bind(cache);
+  cache.locked = (operation) => {
+    cache.locked = locked;
+    cache.claim("B", "B", true);
+    return locked(operation);
+  };
+  assert.equal(cache.reconcile("A").skipped, true);
+  assert.equal(fs.readFileSync(file, "utf8"), bytes);
 });

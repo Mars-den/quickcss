@@ -160,9 +160,11 @@ test("load, manual sync, pause, normal quit and paused restart retain state; sou
   assert.equal(a.saved.autoSync, false);
   const bytes = fs.readFileSync(file, "utf8");
   a.beginShutdown();
+  assert.equal(a.cacheWatcher.watchers.size, 0);
+  assert.equal(a.cacheWatcher.timer, null);
   a.onunload();
   assert.equal(fs.readFileSync(file, "utf8"), bytes);
-  assert.deepEqual(counts(), { disconnects: 4, clears: 2 });
+  assert.deepEqual(counts(), { disconnects: 4, clears: 0 });
   const restarted = instance("A", a.saved);
   await restarted.onload();
   restarted.layout();
@@ -218,7 +220,7 @@ test("restore and pause persists across restarted plugin and cannot reapply auto
   const restarted = instance("A", a.saved);
   await restarted.onload();
   restarted.layout();
-  restarted.poll();
+  restarted.refreshStatus();
   await restarted.sync.run();
   assert.equal(restarted.autoSync, false);
   assert.equal(restarted.cache.state().enabled, false);
@@ -305,7 +307,7 @@ test("manual sync while paused completes even while an old automatic capture is 
   assert.equal(a.autoSync, false);
 });
 
-test("cache timer never scans stylesheets or schedules captures; appearance events still schedule", async (t) => {
+test("no recurring cache timer; appearance events still schedule", async (t) => {
   const { instance, ticks, events, observers } = setup(t),
     a = instance("A");
   await a.onload();
@@ -314,15 +316,15 @@ test("cache timer never scans stylesheets or schedules captures; appearance even
   let schedules = 0,
     polls = 0;
   a.sync.schedule = () => schedules++;
-  a.poll = () => polls++;
+  a.refreshStatus = () => polls++;
   Object.defineProperty(global.document, "styleSheets", {
     get() {
       throw Error("idle stylesheet scan");
     },
     configurable: true,
   });
-  ticks[0]();
-  assert.equal(polls, 1);
+  assert.equal(ticks.length, 0);
+  assert.equal(polls, 0);
   assert.equal(schedules, 0);
   events["css-change"]();
   assert.equal(schedules, 1);
@@ -337,9 +339,8 @@ test("cache timer never scans stylesheets or schedules captures; appearance even
   observers[1]();
   assert.equal(schedules, 3);
   a.beginShutdown();
-  ticks[0]();
   events["css-change"]();
-  assert.equal(polls, 1);
+  assert.equal(polls, 0);
   assert.equal(schedules, 3);
 });
 
@@ -380,4 +381,32 @@ test("newer app versions use resource checks without an unverified-version warni
   await plugin.syncNow();
   assert.match(plugin.status, /^Active:/);
   assert.doesNotMatch(plugin.status, /unverified/);
+});
+
+test("cache notifications repair styling in the owner while followers never reconcile", async (t) => {
+  const { instance, file, base } = setup(t);
+  const owner = instance("A");
+  await owner.onload();
+  owner.layout();
+  owner.sync.cancel();
+  owner.apply(snapshot);
+  const follower = instance("B");
+  await follower.onload();
+  follower.layout();
+  follower.cache.reconcile = () => assert.fail("follower tried to repair CSS");
+  follower.refreshStatus();
+  let captures = 0;
+  owner.captureCurrent = async () => {
+    captures++;
+    return snapshot;
+  };
+  const { atomic } = require("../src/cache.cjs");
+  atomic(file, base);
+  const deadline = Date.now() + 3000;
+  while (!fs.readFileSync(file, "utf8").includes("color:white")) {
+    assert.ok(Date.now() < deadline, "owner did not repair changed cache");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  assert.equal(captures, 0, "cache changes must not recapture the theme");
+  assert.match(follower.status, /following another vault/);
 });

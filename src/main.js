@@ -10,6 +10,7 @@ const crypto = require("node:crypto");
 const { Cache, strip } = require("./cache.cjs");
 const { capture, frame, preparePreview } = require("./capture.cjs");
 const { AutomaticSync } = require("./sync.cjs");
+const { CacheWatcher } = require("./watch.cjs");
 module.exports = class QuickCss extends Plugin {
   async onload() {
     if (!Platform.isMacOS) {
@@ -105,23 +106,28 @@ module.exports = class QuickCss extends Plugin {
         attributes: true,
         attributeFilter: ["class", "style"],
       });
-    // Cache health checks do not inspect or hash the loaded stylesheets.
-    const interval = window.setInterval(() => {
-      if (this.disposed || this.shuttingDown) return;
-      this.poll();
-    }, 5000);
+    this.cacheWatcher = new CacheWatcher(this.cache, {
+      change: () => this.refreshStatus(),
+      error: (error) => {
+        this.status = `Cache monitoring unavailable: ${error.message}. Sync now can retry.`;
+        this.changed();
+      },
+    });
     this.stopBackground = () => {
       headObserver.disconnect();
       appearanceObserver.disconnect();
-      window.clearInterval(interval);
+      this.cacheWatcher.close();
     };
     this.register(() => this.stopBackground());
     this.app.workspace.onLayoutReady(() => {
       if (this.disposed || this.shuttingDown) return;
+      this.cacheWatcher.refresh();
       try {
         if (this.autoSync)
           this.cache.claim(this.owner, this.app.vault.getName());
-        this.poll();
+        // A first claim can create the state directory; bind it immediately.
+        this.cacheWatcher.refresh();
+        this.refreshStatus();
         if (this.autoSync && this.owns()) this.sync.schedule();
       } catch (error) {
         this.status = error.message;
@@ -186,19 +192,25 @@ module.exports = class QuickCss extends Plugin {
   changed() {
     this.tab?.update();
   }
-  poll() {
+  refreshStatus() {
     if (this.disposed || this.shuttingDown) return;
     try {
       const sharedState = this.cache.state();
+      const ownsAppearance = sharedState.owner === this.owner;
       if (!sharedState.enabled) {
         this.status =
-          this.autoSync && this.owns()
+          this.autoSync && ownsAppearance
             ? "Waiting to sync current appearance."
             : "Native appearance. Automatic sync is paused or owned by another vault.";
       } else {
-        const cacheResult = this.cache.reconcile();
-        this.status = `Active: ${sharedState.label} · ${this.owns() ? (this.autoSync ? "automatic sync on" : "sync paused") : "following another vault"}${cacheResult.changed ? " · cache repaired" : ""}.`;
+        // Following vaults observe the shared status without competing to write.
+        const cacheResult = ownsAppearance
+          ? this.cache.reconcile(this.owner)
+          : {};
+        this.status = `Active: ${sharedState.label} · ${ownsAppearance ? (this.autoSync ? "automatic sync on" : "sync paused") : "following another vault"}${cacheResult.changed ? " · cache repaired" : ""}.`;
       }
+      if (this.cacheWatcher?.error)
+        this.status += " Cache monitoring unavailable; use Sync now to retry.";
     } catch (error) {
       this.status = `Blocked: ${error.message}`;
     }
@@ -253,12 +265,13 @@ module.exports = class QuickCss extends Plugin {
       this.changed();
       return;
     }
-    this.poll();
+    this.refreshStatus();
   }
   async syncNow() {
     if (this.busy || this.disposed || this.shuttingDown) return;
     this.busy = true;
     try {
+      this.cacheWatcher?.refresh();
       this.sync.cancel();
       this.cancelCaptures();
       const epoch = this.captureEpoch;
@@ -299,7 +312,7 @@ module.exports = class QuickCss extends Plugin {
       this.cache.claim(this.owner, this.app.vault.getName(), true);
       this.sync.schedule();
     }
-    this.poll();
+    this.refreshStatus();
   }
   async restore() {
     if (this.disposed || this.shuttingDown) return;

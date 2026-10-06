@@ -76,6 +76,8 @@ Quick Look belongs to your Mac, so all your vaults share one preview appearance.
 
 Disabling QuickCss in the source vault restores the native styling. Disabling it in a following vault leaves the source's styling alone. Closing Obsidian normally keeps your last appearance available in Finder.
 
+QuickCss listens for Quick Look cache changes without a recurring scan. Keep the source vault open so it can reapply your styling if Obsidian replaces the cache. If file monitoring is unavailable, **Sync now / use this vault** retries it and refreshes the styling.
+
 ## A few things to know
 
 Quick Look and Obsidian use different renderers, so some text and layout details may differ. Fonts installed on your Mac work best; fonts supplied only through a theme or a download may fall back.
