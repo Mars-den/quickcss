@@ -257,12 +257,17 @@ test("settings saves exclude captured CSS, track pending writes, and stop on shu
   const p = new QuickCss();
   p.autoSync = true;
   p.owner = "A";
+  p.selection = { source: "fixed", theme: "Test", snippets: ["extra"] };
   p.snapshot = { css: "large captured theme" };
   let resolve,
     calls = 0;
   p.saveData = (data) => {
     calls++;
-    assert.deepEqual(data, { autoSync: true, owner: "A" });
+    assert.deepEqual(data, {
+      autoSync: true,
+      owner: "A",
+      appearance: p.selection,
+    });
     return new Promise((r) => (resolve = r));
   };
   const saving = p.save();

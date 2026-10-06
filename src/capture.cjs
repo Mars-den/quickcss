@@ -55,7 +55,7 @@ const PROPERTIES = [
 ];
 const VARIABLES =
   /^--(?:font-|line-height-|file-line-width$|file-margins$|p-spacing$|heading-|h[1-6]-|text-|background-|color-|code-|blockquote-|list-|table-|callout-|link-|hr-|tag-|checkbox-|highlight-|bold-|italic-|embed-|accent-|interactive-accent)/;
-const SAMPLE = `<div class="app-container"><div class="horizontal-main-container"><div class="workspace"><div class="workspace-split mod-root"><div class="workspace-leaf"><div class="workspace-leaf-content" data-type="markdown"><div class="view-content"><div class="markdown-preview-view markdown-rendered is-readable-line-width"><div class="markdown-preview-sizer markdown-preview-section"><h1>Reading with your theme</h1><p>A synthetic paragraph with <strong>bold words</strong>, <em>italic words</em>, <a class="internal-link" href="#">a link</a> and <mark>a highlight</mark>.</p><h2>Headings and emphasis</h2><h3>Heading three</h3><h4>Heading four</h4><h5>Heading five</h5><h6>Heading six</h6><blockquote><p>A quotation wraps across lines so you can compare spacing and its vertical rule. Theme colors should remain readable on this canvas.</p></blockquote><p>Some <code>inline code</code>.</p><pre><code><span class="token keyword">const</span> appearance <span class="token operator">=</span> <span class="token string">"captured"</span><span class="token punctuation">;</span><span class="token comment"> // synthetic</span><span class="token function">capture</span><span class="token number">1</span><span class="token boolean">true</span></code></pre><h2>Lists and tasks</h2><ul><li>A list item</li><li>A second item<ul><li>A nested item</li></ul></li></ul><ol><li>A numbered item</li></ol><ul class="contains-task-list"><li class="task-list-item" data-task=" "><input class="task-list-item-checkbox" type="checkbox"> An open task</li><li class="task-list-item is-checked" data-task="x"><input class="task-list-item-checkbox" type="checkbox" checked> A completed task</li></ul><hr><h2>Tables</h2><div class="el-table"><table><thead><tr><th>Column</th><th>Value</th><th>Detail</th></tr></thead><tbody><tr><td>Theme</td><td>Current</td><td>First</td></tr><tr><td>Content</td><td>Synthetic</td><td>Middle</td></tr><tr><td>State</td><td>Captured</td><td>Last</td></tr></tbody></table></div><h2>Callouts</h2>${["note", "info", "tip", "warning", "danger", "success"].map((type) => `<div class="callout" data-callout="${type}"><div class="callout-title"><div class="callout-title-inner">${type}</div></div><div class="callout-content"><p>A ${type} callout.</p></div></div>`).join("")}<h2>Links and tags</h2><p><a class="tag" href="#">#sample</a> · <a class="internal-link" href="#">An internal link</a> · <a class="external-link" href="https://example.invalid">An external link</a></p><p class="quickcss-preview-end">End of preview — both canvases scroll with the settings page.</p></div></div></div></div></div></div></div></div></div>`;
+const SAMPLE = `<div class="app-container"><div class="horizontal-main-container"><div class="workspace"><div class="workspace-split mod-root"><div class="workspace-leaf"><div class="workspace-leaf-content" data-type="markdown"><div class="view-content"><div class="markdown-preview-view markdown-rendered is-readable-line-width"><div class="markdown-preview-sizer markdown-preview-section"><h1>Reading with your theme <strong>bold</strong> <em>italic</em></h1><p>A synthetic paragraph with <strong>bold words</strong>, <em>italic words</em>, <a class="internal-link" href="#">a link</a> and <mark>a highlight</mark>.</p><h2>Headings and emphasis <strong>bold</strong> <em>italic</em></h2><h3>Heading three <strong>bold</strong> <em>italic</em></h3><h4>Heading four <strong>bold</strong> <em>italic</em></h4><h5>Heading five <strong>bold</strong> <em>italic</em></h5><h6>Heading six <strong>bold</strong> <em>italic</em></h6><blockquote><p>A quotation wraps across lines so you can compare spacing and its vertical rule. Theme colors should remain readable on this canvas.</p></blockquote><p>Some <code>inline code</code>.</p><pre><code><span class="token keyword">const</span> appearance <span class="token operator">=</span> <span class="token string">"captured"</span><span class="token punctuation">;</span><span class="token comment"> // synthetic</span><span class="token function">capture</span><span class="token number">1</span><span class="token boolean">true</span></code></pre><h2>Lists and tasks <strong>bold</strong> <em>italic</em></h2><ul><li>A list item</li><li>A second item<ul><li>A nested item<ul><li>A deeper item</li></ul></li></ul></li></ul><ol><li>A numbered item<ol><li>A nested number<ol><li>A deeper number</li></ol></li></ol></li></ol><ul class="contains-task-list"><li class="task-list-item" data-task=" "><input class="task-list-item-checkbox" type="checkbox"> An open task</li><li class="task-list-item is-checked" data-task="x"><input class="task-list-item-checkbox" type="checkbox" checked> A completed task</li></ul><hr><h2>Tables <strong>bold</strong> <em>italic</em></h2><div class="el-table"><table><thead><tr><th>Column</th><th>Value</th><th>Detail</th></tr></thead><tbody><tr><td>Theme</td><td>Current</td><td>First</td></tr><tr><td>Content</td><td>Synthetic</td><td>Middle</td></tr><tr><td>State</td><td>Captured</td><td>Last</td></tr></tbody></table></div><h2>Callouts <strong>bold</strong> <em>italic</em></h2>${["note", "info", "tip", "warning", "danger", "success"].map((type) => `<div class="callout" data-callout="${type}"><div class="callout-title"><div class="callout-title-inner">${type} <strong>bold</strong> <em>italic</em></div></div><div class="callout-content"><p>A ${type} callout with <strong>bold</strong> and <em>italic</em>.</p></div></div>`).join("")}<h2>Links and tags <strong>bold</strong> <em>italic</em></h2><p><a class="tag" href="#">#sample</a> · <a class="internal-link" href="#">An internal link</a> · <a class="external-link" href="https://example.invalid">An external link</a></p><p class="quickcss-preview-end">End of preview — both canvases scroll with the settings page.</p></div></div></div></div></div></div></div></div></div>`;
 const TARGETS = [
   [".markdown-preview-view", ".markdown-preview-view"],
   ...[
@@ -87,7 +87,10 @@ const TARGETS = [
     "a.tag",
   ].map((selectorSuffix) => [
     ".markdown-rendered " + selectorSuffix,
-    ".markdown-rendered " + selectorSuffix,
+    ".markdown-rendered " +
+      (["strong", "em"].includes(selectorSuffix)
+        ? `p ${selectorSuffix}`
+        : selectorSuffix),
   ]),
   ...[
     "keyword",
@@ -115,6 +118,33 @@ const TARGETS = [
     }),
   ),
 ];
+// Context rules follow the general rules so inherited heading/callout styles
+// and list-depth differences survive scalar export.
+const CONTEXT_TARGETS = [
+  ...[1, 2, 3, 4, 5, 6].flatMap((level) =>
+    ["strong", "em"].map((tag) => `.markdown-rendered h${level} ${tag}`),
+  ),
+  ...["ul", "ol"].flatMap((tag) => [
+    `.markdown-rendered ${tag} > li`,
+    `.markdown-rendered ${tag} ${tag}`,
+    `.markdown-rendered ${tag} ${tag} > li`,
+    `.markdown-rendered ${tag} ${tag} ${tag}`,
+    `.markdown-rendered ${tag} ${tag} ${tag} > li`,
+  ]),
+  ...["note", "info", "tip", "warning", "danger", "success"].flatMap((type) =>
+    [".callout-title-inner", ".callout-content"].flatMap((context) =>
+      ["strong", "em"].map(
+        (tag) =>
+          `.markdown-rendered .callout[data-callout="${type}"] ${context} ${tag}`,
+      ),
+    ),
+  ),
+].map((selector) => {
+  const contextual = selector
+    .replace(/\bul\b/g, "ul:not(.contains-task-list)")
+    .replace(/\bli\b/g, "li:not(.task-list-item)");
+  return [contextual, contextual];
+});
 const TABLE_LAYOUT = [
   "border-collapse",
   "border-spacing",
@@ -589,9 +619,12 @@ function frame(
 }
 async function capture(sourceDocument, appearance = {}, options = {}) {
   checkAbort(options.signal);
-  const loaded = loadedCSS(sourceDocument);
+  const loaded =
+    options.styles === undefined
+      ? loadedCSS(sourceDocument)
+      : { css: options.styles, skipped: 0 };
   if (!loaded.css) throw Error("No readable loaded stylesheets");
-  const classes = Array.from(sourceDocument.body.classList),
+  const classes = options.classes ?? Array.from(sourceDocument.body.classList),
     parts = [];
   for (const mode of ["light", "dark"]) {
     checkAbort(options.signal);
@@ -599,7 +632,7 @@ async function capture(sourceDocument, appearance = {}, options = {}) {
       sourceDocument,
       mode,
       classes,
-      loaded.css,
+      loaded.css + "\n" + (options.extraStyles || ""),
       sourceDocument.body,
       options,
     );
@@ -607,9 +640,11 @@ async function capture(sourceDocument, appearance = {}, options = {}) {
       checkAbort(options.signal);
       const previewDocument = iframe.contentDocument,
         previewWindow = iframe.contentWindow;
-      previewDocument.documentElement.style.cssText =
-        sourceDocument.documentElement.style.cssText;
-      previewDocument.body.style.cssText = sourceDocument.body.style.cssText;
+      if (options.inline !== false) {
+        previewDocument.documentElement.style.cssText =
+          sourceDocument.documentElement.style.cssText;
+        previewDocument.body.style.cssText = sourceDocument.body.style.cssText;
+      }
       const view = previewDocument.querySelector(".markdown-preview-view"),
         colors = colorResolver(previewWindow, previewDocument);
       try {
@@ -620,6 +655,12 @@ async function capture(sourceDocument, appearance = {}, options = {}) {
             previewWindow.getComputedStyle(view),
             [
               ...TARGETS.map(([selector, query]) => [
+                selector,
+                previewWindow.getComputedStyle(
+                  previewDocument.querySelector(query),
+                ),
+              ]),
+              ...CONTEXT_TARGETS.map(([selector, query]) => [
                 selector,
                 previewWindow.getComputedStyle(
                   previewDocument.querySelector(query),
@@ -663,7 +704,9 @@ async function capture(sourceDocument, appearance = {}, options = {}) {
     css: style,
     theme: appearance.cssTheme || "Default",
     snippets: appearance.enabledCssSnippets || [],
-    styleSettings: !!sourceDocument.getElementById("css-settings-manager"),
+    styleSettings:
+      options.inline !== false &&
+      !!sourceDocument.getElementById("css-settings-manager"),
     capturedAt: new Date().toISOString(),
     skippedStylesheets: loaded.skipped,
     warning:
@@ -682,6 +725,7 @@ module.exports = {
   loadedCSS,
   schemeCSS,
   preparePreview,
+  CONTEXT_TARGETS,
   TABLE_TARGETS,
   TABLE_LAYOUT,
   quoteDecoration,

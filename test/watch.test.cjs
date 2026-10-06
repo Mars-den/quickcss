@@ -166,3 +166,20 @@ test("idle monitoring and unrelated files do not schedule cache checks", async (
   assert.equal(changes(), before);
   assert.equal(watcher.timer, null);
 });
+
+test("late duplicate directory notifications do not repeat settled checks, but resource edits still notify", async (t) => {
+  const { cache, watcher, changes } = fixture(t);
+  await waitFor(() => changes() > 0 && watcher.timer === null);
+  const before = changes();
+  // Reproduce a native event delivered after the registration debounce has
+  // already fired, including platforms that cannot identify the changed name.
+  watcher.schedule();
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  assert.equal(changes(), before);
+  atomic(
+    cache.stateFile,
+    JSON.stringify({ ...cache.state(), ownerLabel: "renamed" }),
+  );
+  await waitFor(() => changes() > before);
+  assert.equal(cache.state().ownerLabel, "renamed");
+});
