@@ -1,43 +1,326 @@
-const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto');
-const {css,validate}=require('./profile.cjs');
-const {safeSnapshot}=require('./assets.cjs');
-const BEGIN='\n/* quickcss:begin v1 */\n',END='\n/* quickcss:end v1 */\n';
-function strip(source){
- const b=source.indexOf(BEGIN),e=source.indexOf(END);
- if(b<0&&e<0){if(source.includes('quickcss:begin')||source.includes('quickcss:end'))throw Error('Unrecognized QuickCss markers; manual review required');return source;}
- if(b<0||e<b||source.indexOf(BEGIN,b+1)>=0||source.indexOf(END,e+1)>=0)throw Error('Damaged or duplicate QuickCss block; manual review required');
- return source.slice(0,b)+source.slice(e+END.length);
+const fs = require("node:fs"),
+  path = require("node:path"),
+  os = require("node:os"),
+  crypto = require("node:crypto");
+const { css, validate } = require("./profile.cjs");
+const { safeSnapshot } = require("./assets.cjs");
+const BEGIN = "\n/* quickcss:begin v1 */\n",
+  END = "\n/* quickcss:end v1 */\n";
+function strip(sourceCSS) {
+  const beginIndex = sourceCSS.indexOf(BEGIN),
+    endIndex = sourceCSS.indexOf(END);
+  if (beginIndex < 0 && endIndex < 0) {
+    if (
+      sourceCSS.includes("quickcss:begin") ||
+      sourceCSS.includes("quickcss:end")
+    )
+      throw Error("Unrecognized QuickCss markers; manual review required");
+    return sourceCSS;
+  }
+  if (
+    beginIndex < 0 ||
+    endIndex < beginIndex ||
+    sourceCSS.indexOf(BEGIN, beginIndex + 1) >= 0 ||
+    sourceCSS.indexOf(END, endIndex + 1) >= 0
+  )
+    throw Error("Damaged or duplicate QuickCss block; manual review required");
+  return (
+    sourceCSS.slice(0, beginIndex) + sourceCSS.slice(endIndex + END.length)
+  );
 }
-function patch(source,style){return strip(source)+BEGIN+style+END;}
-function atomic(file,value,expected){
- if(expected!==undefined&&fs.readFileSync(file,'utf8')!==expected)throw Error('Resource changed during operation; retry');
- const mode=fs.existsSync(file)?fs.statSync(file).mode&0o777:0o600;
- const tmp=file+'.quickcss-'+crypto.randomUUID();
- try{const fd=fs.openSync(tmp,'wx',mode);try{fs.writeFileSync(fd,value);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
- if(expected!==undefined&&fs.readFileSync(file,'utf8')!==expected)throw Error('Resource changed during operation; retry');fs.renameSync(tmp,file);
- }finally{if(fs.existsSync(tmp))fs.unlinkSync(tmp);}
+function patch(sourceCSS, cssText) {
+  return strip(sourceCSS) + BEGIN + cssText + END;
+}
+function atomic(filePath, value, expected) {
+  if (expected !== undefined && fs.readFileSync(filePath, "utf8") !== expected)
+    throw Error("Resource changed during operation; retry");
+  const mode = fs.existsSync(filePath)
+    ? fs.statSync(filePath).mode & 0o777
+    : 0o600;
+  const temporaryPath = filePath + ".quickcss-" + crypto.randomUUID();
+  try {
+    const fileDescriptor = fs.openSync(temporaryPath, "wx", mode);
+    try {
+      fs.writeFileSync(fileDescriptor, value);
+      fs.fsyncSync(fileDescriptor);
+    } finally {
+      fs.closeSync(fileDescriptor);
+    }
+    if (
+      expected !== undefined &&
+      fs.readFileSync(filePath, "utf8") !== expected
+    )
+      throw Error("Resource changed during operation; retry");
+    fs.renameSync(temporaryPath, filePath);
+  } finally {
+    if (fs.existsSync(temporaryPath)) fs.unlinkSync(temporaryPath);
+  }
 }
 class Cache {
- constructor(root=path.join(os.homedir(),'Library/Application Support/obsidian/quicklook'),stateRoot=path.join(os.homedir(),'Library/Application Support/QuickCss')){this.root=root;this.stateRoot=stateRoot;this.stateFile=path.join(stateRoot,'profile.json');}
- state(){if(!fs.existsSync(this.stateFile))return {schema:1,enabled:false};const s=JSON.parse(fs.readFileSync(this.stateFile,'utf8'));if(![1,2].includes(s.schema)||typeof s.enabled!=='boolean'||(s.enabled&&typeof s.css!=='string'))throw Error('Unsupported shared profile');return s;}
- locked(fn){fs.mkdirSync(this.stateRoot,{recursive:true,mode:0o700});const lock=path.join(this.stateRoot,'write.lock');let fd;try{fd=fs.openSync(lock,'wx',0o600);}catch(e){throw Error('Another QuickCss instance is writing, or a stale write.lock requires review');}try{fs.writeFileSync(fd,String(process.pid));return fn();}finally{fs.closeSync(fd);fs.unlinkSync(lock);}}
- current(){const dir=fs.realpathSync(path.join(this.root,'current'));if(path.dirname(dir)!==fs.realpathSync(this.root)||! /^[a-f0-9]{64}$/.test(path.basename(dir)))throw Error('Unsupported Quick Look cache location');
- const file=path.join(dir,'quicklook.css');for(const name of ['quicklook.css','quicklook.js','index.html'])if(!fs.lstatSync(path.join(dir,name)).isFile())throw Error('Unsupported Quick Look resource');
- const html=fs.readFileSync(path.join(dir,'index.html'),'utf8'),js=fs.readFileSync(path.join(dir,'quicklook.js'),'utf8'),source=fs.readFileSync(file,'utf8');
- if(!html.includes('href="quicklook.css"')||!html.includes('src="quicklook.js"')||!js.includes('onQuickLookReady')||!source.includes('--font-text-size')||!source.includes('.markdown-rendered'))throw Error('Unsupported Quick Look renderer; nothing patched');
- return {dir,file,source};}
- writeCurrent(style){const {dir,file,source}=this.current();const next=patch(source,style);if(next===source)return {changed:false,cache:path.basename(dir)};
- const backups=path.join(this.stateRoot,'backups');fs.mkdirSync(backups,{recursive:true,mode:0o700});const base=strip(source),id=crypto.createHash('sha256').update(base).digest('hex'),backup=path.join(backups,id+'.css');
- if(!fs.existsSync(backup))atomic(backup,base);atomic(file,next,source);return {changed:true,cache:path.basename(dir)};}
- apply(profile,label,version){const p=validate(profile),style=css(p);return this.locked(()=>{this.current();atomic(this.stateFile,JSON.stringify({schema:1,enabled:true,profile:p,css:style,label,version,appliedAt:new Date().toISOString()},null,2));return this.writeCurrent(style);});}
- applySnapshot(snapshot,label,version,owner){
- if(snapshot?.schema!==2||typeof snapshot.css!=='string'||snapshot.css.length>1000000||!safeSnapshot(snapshot.css))throw Error('Invalid captured appearance');
- return this.locked(()=>{const previous=this.state();if(owner&&previous.owner!==owner)return {skipped:true};this.current();if(previous.enabled&&previous.css===snapshot.css&&previous.owner===owner&&previous.label===label&&previous.version===version)return this.writeCurrent(snapshot.css);atomic(this.stateFile,JSON.stringify({schema:2,owner:owner||previous.owner,enabled:true,snapshot,css:snapshot.css,label,version,appliedAt:new Date().toISOString()},null,2));return this.writeCurrent(snapshot.css);});
- }
- claim(owner,label,force=false){return this.locked(()=>{const s=this.state();if(s.owner&&s.owner!==owner&&!force)return false;atomic(this.stateFile,JSON.stringify({...s,owner,ownerLabel:label},null,2));return true;});}
- reconcile(){return this.locked(()=>{const s=this.state();if(!s.enabled)return {enabled:false};return {...this.writeCurrent(s.css),enabled:true,label:s.label,version:s.version};});}
- restore(owner){return this.locked(()=>{const s=this.state();if(owner&&s.owner!==owner)return 0;atomic(this.stateFile,JSON.stringify({...s,enabled:false},null,2));let count=0;
- if(fs.existsSync(this.root))for(const name of fs.readdirSync(this.root)){if(!/^[a-f0-9]{64}$/.test(name))continue;const dir=path.join(this.root,name);if(!fs.lstatSync(dir).isDirectory())continue;const file=path.join(dir,'quicklook.css');if(!fs.existsSync(file)||!fs.lstatSync(file).isFile())continue;const source=fs.readFileSync(file,'utf8'),next=strip(source);if(next!==source){atomic(file,next,source);count++;}}
- return count;});}
+  constructor(
+    root = path.join(
+      os.homedir(),
+      "Library/Application Support/obsidian/quicklook",
+    ),
+    stateRoot = path.join(os.homedir(), "Library/Application Support/QuickCss"),
+  ) {
+    this.root = root;
+    this.stateRoot = stateRoot;
+    this.stateFile = path.join(stateRoot, "profile.json");
+  }
+  state() {
+    if (!fs.existsSync(this.stateFile)) return { schema: 1, enabled: false };
+    const sharedState = JSON.parse(fs.readFileSync(this.stateFile, "utf8"));
+    if (
+      ![1, 2].includes(sharedState.schema) ||
+      typeof sharedState.enabled !== "boolean" ||
+      (sharedState.enabled && typeof sharedState.css !== "string")
+    )
+      throw Error("Unsupported shared profile");
+    return sharedState;
+  }
+  locked(operation) {
+    fs.mkdirSync(this.stateRoot, { recursive: true, mode: 0o700 });
+    const lockPath = path.join(this.stateRoot, "write.lock");
+    let fileDescriptor;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        fileDescriptor = fs.openSync(lockPath, "wx", 0o600);
+        break;
+      } catch (error) {
+        if (error.code !== "EEXIST") throw error;
+      }
+      let previousLockStat, lockContents;
+      try {
+        previousLockStat = fs.lstatSync(lockPath);
+        if (!previousLockStat.isFile())
+          throw Error("Unsupported QuickCss lock");
+        lockContents = fs.readFileSync(lockPath, "utf8");
+      } catch (error) {
+        if (error.code === "ENOENT") continue;
+        throw error;
+      }
+      let lockMetadata;
+      try {
+        lockMetadata = JSON.parse(lockContents);
+      } catch {}
+      const pid =
+        typeof lockMetadata === "number" ? lockMetadata : lockMetadata?.pid;
+      let stale = false;
+      if (Number.isInteger(pid) && pid > 0) {
+        try {
+          process.kill(pid, 0);
+        } catch (error) {
+          if (error.code === "ESRCH") stale = true;
+          else if (error.code !== "EPERM") throw error;
+        }
+      }
+      // A live writer never expires. Allow time for a newly created lock to acquire metadata.
+      else stale = Date.now() - previousLockStat.mtimeMs > 10000;
+      if (!stale)
+        throw Error("Another QuickCss instance is writing; try again shortly");
+      try {
+        const currentLockStat = fs.lstatSync(lockPath);
+        if (
+          currentLockStat.dev === previousLockStat.dev &&
+          currentLockStat.ino === previousLockStat.ino &&
+          currentLockStat.mtimeMs === previousLockStat.mtimeMs &&
+          fs.readFileSync(lockPath, "utf8") === lockContents
+        )
+          fs.unlinkSync(lockPath);
+      } catch (error) {
+        if (error.code !== "ENOENT") throw error;
+      }
+    }
+    if (fileDescriptor === undefined)
+      throw Error("QuickCss lock changed during recovery; try again shortly");
+    const ownedLockStat = fs.fstatSync(fileDescriptor);
+    try {
+      fs.writeFileSync(
+        fileDescriptor,
+        JSON.stringify({ pid: process.pid, createdAt: Date.now() }),
+      );
+      return operation();
+    } finally {
+      fs.closeSync(fileDescriptor);
+      try {
+        const currentLockStat = fs.lstatSync(lockPath);
+        if (
+          currentLockStat.dev === ownedLockStat.dev &&
+          currentLockStat.ino === ownedLockStat.ino
+        )
+          fs.unlinkSync(lockPath);
+      } catch (error) {
+        if (error.code !== "ENOENT") throw error;
+      }
+    }
+  }
+  current() {
+    const cacheDirectory = fs.realpathSync(path.join(this.root, "current"));
+    if (
+      path.dirname(cacheDirectory) !== fs.realpathSync(this.root) ||
+      !/^[a-f0-9]{64}$/.test(path.basename(cacheDirectory))
+    )
+      throw Error("Unsupported Quick Look cache location");
+    const filePath = path.join(cacheDirectory, "quicklook.css");
+    for (const fileName of ["quicklook.css", "quicklook.js", "index.html"])
+      if (!fs.lstatSync(path.join(cacheDirectory, fileName)).isFile())
+        throw Error("Unsupported Quick Look resource");
+    const rendererHTML = fs.readFileSync(
+        path.join(cacheDirectory, "index.html"),
+        "utf8",
+      ),
+      rendererJavaScript = fs.readFileSync(
+        path.join(cacheDirectory, "quicklook.js"),
+        "utf8",
+      ),
+      sourceCSS = fs.readFileSync(filePath, "utf8");
+    if (
+      !rendererHTML.includes('href="quicklook.css"') ||
+      !rendererHTML.includes('src="quicklook.js"') ||
+      !rendererJavaScript.includes("onQuickLookReady") ||
+      !sourceCSS.includes("--font-text-size") ||
+      !sourceCSS.includes(".markdown-rendered")
+    )
+      throw Error("Unsupported Quick Look renderer; nothing patched");
+    return { dir: cacheDirectory, file: filePath, source: sourceCSS };
+  }
+  writeCurrent(cssText) {
+    const {
+      dir: cacheDirectory,
+      file: filePath,
+      source: sourceCSS,
+    } = this.current();
+    const updatedCSS = patch(sourceCSS, cssText);
+    if (updatedCSS === sourceCSS)
+      return { changed: false, cache: path.basename(cacheDirectory) };
+    const backups = path.join(this.stateRoot, "backups");
+    fs.mkdirSync(backups, { recursive: true, mode: 0o700 });
+    const baseCSS = strip(sourceCSS),
+      backupHash = crypto.createHash("sha256").update(baseCSS).digest("hex"),
+      backup = path.join(backups, backupHash + ".css");
+    if (!fs.existsSync(backup)) atomic(backup, baseCSS);
+    atomic(filePath, updatedCSS, sourceCSS);
+    return { changed: true, cache: path.basename(cacheDirectory) };
+  }
+  apply(profile, label, version) {
+    const validatedProfile = validate(profile),
+      cssText = css(validatedProfile);
+    return this.locked(() => {
+      this.current();
+      atomic(
+        this.stateFile,
+        JSON.stringify(
+          {
+            schema: 1,
+            enabled: true,
+            profile: validatedProfile,
+            css: cssText,
+            label,
+            version,
+            appliedAt: new Date().toISOString(),
+          },
+          null,
+          2,
+        ),
+      );
+      return this.writeCurrent(cssText);
+    });
+  }
+  applySnapshot(snapshot, label, version, ownerId) {
+    if (
+      snapshot?.schema !== 2 ||
+      typeof snapshot.css !== "string" ||
+      snapshot.css.length > 1000000 ||
+      !safeSnapshot(snapshot.css)
+    )
+      throw Error("Invalid captured appearance");
+    return this.locked(() => {
+      const previousState = this.state();
+      if (ownerId && previousState.owner !== ownerId) return { skipped: true };
+      this.current();
+      if (
+        previousState.enabled &&
+        previousState.css === snapshot.css &&
+        previousState.owner === ownerId &&
+        previousState.label === label &&
+        previousState.version === version
+      )
+        return this.writeCurrent(snapshot.css);
+      atomic(
+        this.stateFile,
+        JSON.stringify(
+          {
+            schema: 2,
+            owner: ownerId || previousState.owner,
+            enabled: true,
+            snapshot,
+            css: snapshot.css,
+            label,
+            version,
+            appliedAt: new Date().toISOString(),
+          },
+          null,
+          2,
+        ),
+      );
+      return this.writeCurrent(snapshot.css);
+    });
+  }
+  claim(ownerId, label, force = false) {
+    return this.locked(() => {
+      const sharedState = this.state();
+      if (sharedState.owner && sharedState.owner !== ownerId && !force)
+        return false;
+      atomic(
+        this.stateFile,
+        JSON.stringify(
+          { ...sharedState, owner: ownerId, ownerLabel: label },
+          null,
+          2,
+        ),
+      );
+      return true;
+    });
+  }
+  reconcile() {
+    return this.locked(() => {
+      const sharedState = this.state();
+      if (!sharedState.enabled) return { enabled: false };
+      return {
+        ...this.writeCurrent(sharedState.css),
+        enabled: true,
+        label: sharedState.label,
+        version: sharedState.version,
+      };
+    });
+  }
+  restore(ownerId) {
+    return this.locked(() => {
+      const sharedState = this.state();
+      if (ownerId && sharedState.owner !== ownerId) return 0;
+      atomic(
+        this.stateFile,
+        JSON.stringify({ ...sharedState, enabled: false }, null, 2),
+      );
+      let restoredCount = 0;
+      if (fs.existsSync(this.root))
+        for (const fileName of fs.readdirSync(this.root)) {
+          if (!/^[a-f0-9]{64}$/.test(fileName)) continue;
+          const cacheDirectory = path.join(this.root, fileName);
+          if (!fs.lstatSync(cacheDirectory).isDirectory()) continue;
+          const filePath = path.join(cacheDirectory, "quicklook.css");
+          if (!fs.existsSync(filePath) || !fs.lstatSync(filePath).isFile())
+            continue;
+          const sourceCSS = fs.readFileSync(filePath, "utf8"),
+            updatedCSS = strip(sourceCSS);
+          if (updatedCSS !== sourceCSS) {
+            atomic(filePath, updatedCSS, sourceCSS);
+            restoredCount++;
+          }
+        }
+      return restoredCount;
+    });
+  }
 }
-module.exports={Cache,strip,patch,atomic,BEGIN,END};
+module.exports = { Cache, strip, patch, atomic, BEGIN, END };

@@ -115,11 +115,14 @@ Restoration removes QuickCss's own block and keeps unrelated CSS. It doesn't mod
 
 ```sh
 npm ci
+npm run format:check
 npm test
 npm run build
 ```
 
 Install the generated `main.js` with `manifest.json` and `styles.css`. Releases are built in GitHub Actions with artifact attestations for the three files.
+
+Source and tests use normal formatting and descriptive names. Run `npm run format` before contributing; CI checks formatting with `npm run format:check`.
 
 ## License
 

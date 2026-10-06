@@ -1,15 +1,18 @@
 {
   "name": "quickcss",
-  "version": "0.3.10",
+  "version": "0.3.11",
   "private": true,
   "description": "Obsidian theme and CSS styling for macOS Quick Look Markdown previews in Finder",
   "scripts": {
     "build": "node esbuild.config.mjs",
-    "test": "node --test test/*.test.cjs"
+    "test": "node --test test/*.test.cjs",
+    "format": "prettier --write src test esbuild.config.mjs",
+    "format:check": "prettier --check src test esbuild.config.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",
-    "obsidian": "latest"
+    "obsidian": "latest",
+    "prettier": "3.6.2"
   },
   "license": "MIT",
   "author": "Mars-den"

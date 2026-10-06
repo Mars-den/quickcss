@@ -1,7 +1,7 @@
 {
   "id": "quickcss",
   "name": "QuickCss",
-  "version": "0.3.10",
+  "version": "0.3.11",
   "minAppVersion": "1.14.4",
   "description": "Make macOS Quick Look Markdown previews in Finder follow your theme, CSS snippets, Style Settings, fonts, colors, tables, code blocks, and task lists.",
   "author": "Mars-den",
