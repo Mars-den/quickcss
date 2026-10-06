@@ -1,0 +1,4 @@
+.quickcss-status{padding:12px;background:var(--background-secondary);border-radius:8px;}
+.quickcss-previews{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;max-width:1200px;align-items:start;}
+.quickcss-preview-card{min-width:0;}
+@media (max-width:800px){.quickcss-previews{grid-template-columns:1fr;}}

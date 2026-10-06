@@ -1,0 +1,10 @@
+{
+  "id": "quickcss",
+  "name": "QuickCss",
+  "version": "0.3.7",
+  "minAppVersion": "1.14.4",
+  "description": "Make macOS Quick Look Markdown previews in Finder match your Obsidian theme, CSS snippets, Style Settings, fonts, colors, tables, code blocks, and task lists.",
+  "author": "Mars-den",
+  "isDesktopOnly": true,
+  "authorUrl": "https://github.com/Mars-den"
+}
