@@ -60,6 +60,8 @@ Once enabled, QuickCss captures your reading appearance and keeps it in sync. Se
 
 Open **Settings → QuickCss** for sample light and dark previews. They use your **text font**; the **interface font** is a separate setting for Obsidian's menus and settings.
 
+Appearance changes are detected through Obsidian events and style changes. If another plugin changes styling without notifying Obsidian, choose **Sync now / use this vault** to refresh it.
+
 Already have a Quick Look window open? Close it and open it again after changing your appearance. Existing previews can hang onto the old styling.
 
 | Control | When to use it |
