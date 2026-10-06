@@ -4,6 +4,39 @@ Your notes look the way you want in Obsidian. They should feel familiar when you
 
 QuickCss brings your theme, CSS snippets, and Style Settings choices to macOS Quick Look. Fonts, colors, headings, tables, code blocks, quotations, task checkboxes, and common callouts follow your reading appearance automatically. Change your theme and QuickCss picks it up—no second set of appearance sliders to maintain.
 
+## A few familiar looks
+
+The same Quick Look preview, with different themes and settings. These screenshots use sample notes.
+
+### AnuPpuccin
+
+| Light | Dark |
+| --- | --- |
+| ![AnuPpuccin light: a Finder preview with a table, tasks, and a callout](images/anuppuccin-light.png) | ![AnuPpuccin dark: the same sample note in Finder Quick Look](images/anuppuccin-dark.png) |
+
+<details>
+<summary>See Primary, Minimal, and Baseline</summary>
+
+### Primary
+
+| Light | Dark |
+| --- | --- |
+| ![Primary light: game-night notes in Finder Quick Look](images/primary-light.png) | ![Primary dark: game-night notes in Finder Quick Look](images/primary-dark.png) |
+
+### Minimal
+
+| Light | Dark |
+| --- | --- |
+| ![Minimal light: a coffee recipe with code and a callout](images/minimal-light.png) | ![Minimal dark: the same coffee recipe in Finder Quick Look](images/minimal-dark.png) |
+
+### Baseline
+
+| Light | Dark |
+| --- | --- |
+| ![Baseline light: a shift handover with table and checkboxes](images/baseline-light.png) | ![Baseline dark: the same shift handover in Finder Quick Look](images/baseline-dark.png) |
+
+</details>
+
 ## Before you install
 
 Obsidian added Markdown Quick Look previews in [version 1.14](https://obsidian.md/changelog/2026-10-05-desktop-v1.14.4/). **You need a recent installer**, not just an in-app update. If you've been updating the same installation for a while, [download Obsidian again](https://obsidian.md/download) and reinstall it to get the native extension.
