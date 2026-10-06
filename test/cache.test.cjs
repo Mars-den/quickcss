@@ -147,11 +147,14 @@ test("dead process locks recover, including legacy PID-only locks", (t) => {
     process.kill = kill;
   }
 });
-test("live process locks never expire and permission-denied probes remain locked", (t) => {
+test("recent live process locks and permission-denied probes remain locked", (t) => {
   const { cache } = fixture(t);
   fs.mkdirSync(cache.stateRoot);
   const lock = path.join(cache.stateRoot, "write.lock");
-  fs.writeFileSync(lock, JSON.stringify({ pid: process.pid, createdAt: 1 }));
+  fs.writeFileSync(
+    lock,
+    JSON.stringify({ pid: process.pid, createdAt: Date.now() }),
+  );
   fs.utimesSync(lock, 1, 1);
   assert.throws(() => cache.claim("A", "A"), /Another QuickCss/);
   const kill = process.kill;
@@ -203,5 +206,41 @@ test("recovery preserves a lock replaced during the process probe", (t) => {
     assert.equal(JSON.parse(fs.readFileSync(lock, "utf8")).pid, process.pid);
   } finally {
     process.kill = kill;
+  }
+});
+
+test("expired locks recover despite a reused live PID or permission-denied process probe", (t) => {
+  const { cache } = fixture(t);
+  fs.mkdirSync(cache.stateRoot);
+  const lock = path.join(cache.stateRoot, "write.lock");
+  const kill = process.kill;
+  process.kill = () => {
+    throw Object.assign(Error("denied"), { code: "EPERM" });
+  };
+  try {
+    fs.writeFileSync(
+      lock,
+      JSON.stringify({ pid: process.pid, createdAt: Date.now() - 31000 }),
+    );
+    cache.claim("A", "A");
+    assert.equal(fs.existsSync(lock), false);
+    assert.equal(cache.state().owner, "A");
+  } finally {
+    process.kill = kill;
+  }
+});
+test("legacy and invalid timestamps use lock modification time for expiry", (t) => {
+  const { cache } = fixture(t);
+  fs.mkdirSync(cache.stateRoot);
+  const lock = path.join(cache.stateRoot, "write.lock");
+  for (const data of [
+    String(process.pid),
+    JSON.stringify({ pid: process.pid, createdAt: "invalid" }),
+    JSON.stringify({ pid: process.pid, createdAt: Date.now() + 60000 }),
+  ]) {
+    fs.writeFileSync(lock, data);
+    fs.utimesSync(lock, 1, 1);
+    cache.claim("A", "A");
+    assert.equal(fs.existsSync(lock), false);
   }
 });

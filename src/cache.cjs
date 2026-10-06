@@ -106,8 +106,17 @@ class Cache {
       } catch {}
       const pid =
         typeof lockMetadata === "number" ? lockMetadata : lockMetadata?.pid;
-      let stale = false;
-      if (Number.isInteger(pid) && pid > 0) {
+      const now = Date.now();
+      const createdAt =
+        Number.isFinite(lockMetadata?.createdAt) &&
+        lockMetadata.createdAt > 0 &&
+        lockMetadata.createdAt <= now
+          ? lockMetadata.createdAt
+          : previousLockStat.mtimeMs;
+      // PID reuse after a reboot must not leave a lock permanently active.
+      // Writes are synchronous; thirty seconds is the maximum lock lifetime.
+      let stale = now - createdAt >= 30000;
+      if (!stale && Number.isInteger(pid) && pid > 0 && pid <= 2147483647) {
         try {
           process.kill(pid, 0);
         } catch (error) {
@@ -115,8 +124,13 @@ class Cache {
           else if (error.code !== "EPERM") throw error;
         }
       }
-      // A live writer never expires. Allow time for a newly created lock to acquire metadata.
-      else stale = Date.now() - previousLockStat.mtimeMs > 10000;
+      // Incomplete metadata may belong to a writer that just created the file.
+      else if (
+        !stale &&
+        (!Number.isInteger(pid) || pid <= 0 || pid > 2147483647)
+      ) {
+        stale = now - previousLockStat.mtimeMs > 10000;
+      }
       if (!stale)
         throw Error("Another QuickCss instance is writing; try again shortly");
       try {
