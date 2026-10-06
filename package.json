@@ -7,7 +7,8 @@
     "build": "node esbuild.config.mjs",
     "test": "node --test test/*.test.cjs",
     "format": "prettier --write src test esbuild.config.mjs",
-    "format:check": "prettier --check src test esbuild.config.mjs"
+    "format:check": "prettier --check src test esbuild.config.mjs",
+    "test:render": "node test/render.cjs"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",

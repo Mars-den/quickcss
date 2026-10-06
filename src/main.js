@@ -11,6 +11,12 @@ const { Cache, strip } = require("./cache.cjs");
 const { capture, frame, preparePreview } = require("./capture.cjs");
 const { AutomaticSync } = require("./sync.cjs");
 const { CacheWatcher } = require("./watch.cjs");
+const {
+  settings,
+  installed,
+  evaluation,
+  watchFiles,
+} = require("./appearance.cjs");
 module.exports = class QuickCss extends Plugin {
   async onload() {
     if (!Platform.isMacOS) {
@@ -23,6 +29,7 @@ module.exports = class QuickCss extends Plugin {
     const saved = await this.loadData();
     this.snapshot = saved?.snapshot?.schema === 2 ? saved.snapshot : null;
     this.autoSync = saved?.autoSync !== false;
+    this.selection = settings(saved?.appearance);
     const vaultPath = this.app.vault.adapter.getBasePath?.();
     this.owner = vaultPath
       ? crypto
@@ -35,7 +42,11 @@ module.exports = class QuickCss extends Plugin {
       this.snapshot = shared.snapshot;
     this.pendingSettingsWrites = 0;
     if (saved?.snapshot)
-      await this.saveData({ autoSync: this.autoSync, owner: this.owner });
+      await this.saveData({
+        autoSync: this.autoSync,
+        owner: this.owner,
+        appearance: this.selection,
+      });
     this.status = "Waiting for appearance to load.";
     this.disposed = false;
     this.busy = false;
@@ -113,7 +124,16 @@ module.exports = class QuickCss extends Plugin {
         this.changed();
       },
     });
+    const stopFiles = watchFiles(
+      this.app,
+      () => this.scheduleAppearance(),
+      (error) =>
+        new Notice(
+          `Appearance file monitoring unavailable: ${error.message}. Use Sync now to refresh selected files.`,
+        ),
+    );
     this.stopBackground = () => {
+      stopFiles();
       headObserver.disconnect();
       appearanceObserver.disconnect();
       this.cacheWatcher.close();
@@ -184,7 +204,11 @@ module.exports = class QuickCss extends Plugin {
     if (this.disposed || this.shuttingDown) return;
     this.pendingSettingsWrites = (this.pendingSettingsWrites || 0) + 1;
     try {
-      await this.saveData({ autoSync: this.autoSync, owner: this.owner });
+      await this.saveData({
+        autoSync: this.autoSync,
+        owner: this.owner,
+        appearance: this.selection,
+      });
     } finally {
       this.pendingSettingsWrites--;
     }
@@ -207,7 +231,11 @@ module.exports = class QuickCss extends Plugin {
         const cacheResult = ownsAppearance
           ? this.cache.reconcile(this.owner)
           : {};
-        this.status = `Active: ${sharedState.label} · ${ownsAppearance ? (this.autoSync ? "automatic sync on" : "sync paused") : "following another vault"}${cacheResult.changed ? " · cache repaired" : ""}.`;
+        if (ownsAppearance) Object.assign(sharedState, this.cache.state());
+        this.status =
+          sharedState.application && sharedState.application !== "applied"
+            ? `Appearance saved; Quick Look application ${sharedState.application}: ${sharedState.applicationError || "waiting for owner to retry"}.`
+            : `Active: ${sharedState.label} · ${ownsAppearance ? (this.autoSync ? "automatic sync on" : "sync paused") : "following another vault"}${cacheResult.changed ? " · cache repaired" : ""}.`;
       }
       if (this.cacheWatcher?.error)
         this.status += " Cache monitoring unavailable; use Sync now to retry.";
@@ -221,6 +249,7 @@ module.exports = class QuickCss extends Plugin {
       throw Object.assign(new Error("QuickCss stopped"), {
         name: "AbortError",
       });
+    const selection = settings(this.selection);
     const epoch = this.captureEpoch || 0,
       controller = new AbortController();
     (this.captureControllers ??= new Set()).add(controller);
@@ -233,7 +262,14 @@ module.exports = class QuickCss extends Plugin {
           ),
         );
       } catch {}
-      const snapshot = await capture(document, appearance, {
+      const source = await evaluation(
+        this.app,
+        this.cache,
+        selection,
+        appearance,
+      );
+      const snapshot = await capture(document, source.appearance, {
+        ...source.options,
         signal: controller.signal,
       });
       if (
@@ -298,6 +334,22 @@ module.exports = class QuickCss extends Plugin {
       )
         this.sync.schedule();
     }
+  }
+  async setAppearance(changes) {
+    if (this.disposed || this.shuttingDown) return;
+    this.selection = settings({ ...this.selection, ...changes });
+    this.sync.cancel();
+    this.cancelCaptures();
+    const epoch = this.captureEpoch;
+    await this.save();
+    if (this.disposed || this.shuttingDown || epoch !== this.captureEpoch)
+      return;
+    if (this.autoSync && this.owns()) this.sync.schedule();
+    this.status =
+      this.autoSync && this.owns()
+        ? "Waiting to sync selected appearance."
+        : "Selection saved. Sync now to apply, or enable automatic sync.";
+    this.changed();
   }
   async setAutomatic(value) {
     if (this.disposed || this.shuttingDown) return;
@@ -364,7 +416,7 @@ class QuickCssSettingsTab extends PluginSettingTab {
       container = this.containerEl;
     container.empty();
     container.createEl("p", {
-      text: "Your theme, CSS snippets and Style Settings selections automatically style native macOS Quick Look.",
+      text: "Choose a vault appearance or a fixed theme for native macOS Quick Look.",
     });
     this.status = container.createEl("p", {
       cls: "quickcss-status",
@@ -373,7 +425,7 @@ class QuickCssSettingsTab extends PluginSettingTab {
     new Setting(container)
       .setName("Automatic sync")
       .setDesc(
-        "Keep Quick Look up to date with appearance changes in this vault.",
+        "Keep Quick Look up to date with the selected source and snippet files.",
       )
       .addToggle((toggle) =>
         toggle
@@ -412,10 +464,99 @@ class QuickCssSettingsTab extends PluginSettingTab {
     container.createEl("p", {
       text: "One vault owns automatic sync across macOS. Other vaults follow it until you choose “use this vault”. Existing Quick Look panels may need reopening to refresh. Appearance is retained when Obsidian closes normally.",
     });
+    this.sources = container.createDiv();
+    this.showSources();
     this.details = container.createEl("p");
     this.previews = container.createDiv({ cls: "quickcss-previews" });
     this.rendered = null;
     this.update();
+  }
+  async showSources() {
+    const generation = (this.sourceGeneration =
+        (this.sourceGeneration || 0) + 1),
+      container = this.sources,
+      plugin = this.plugin;
+    container.empty();
+    const change = (values) =>
+      plugin
+        .setAppearance(values)
+        .catch(
+          (error) =>
+            new Notice(`Appearance selection failed: ${error.message}`),
+        );
+    new Setting(container)
+      .setName("Appearance source")
+      .setDesc(
+        "Fixed theme uses native reading defaults and ignores this vault’s active theme and Style Settings.",
+      )
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOption("vault", "Follow this vault")
+          .addOption("fixed", "Fixed theme")
+          .setValue(plugin.selection.source)
+          .onChange(async (source) => {
+            await change({ source });
+            this.showSources();
+          }),
+      );
+    try {
+      const choices = await installed(
+        this.app.vault.adapter,
+        this.app.vault.configDir,
+      );
+      if (generation !== this.sourceGeneration || !container.isConnected)
+        return;
+      if (plugin.selection.source === "fixed") {
+        new Setting(container).setName("Theme").addDropdown((dropdown) => {
+          dropdown.addOption("", "Default");
+          for (const theme of choices.themes) dropdown.addOption(theme, theme);
+          if (
+            plugin.selection.theme &&
+            !choices.themes.includes(plugin.selection.theme)
+          )
+            dropdown.addOption(
+              plugin.selection.theme,
+              `${plugin.selection.theme} (missing)`,
+            );
+          dropdown
+            .setValue(plugin.selection.theme)
+            .onChange((theme) => change({ theme }));
+        });
+      }
+      const snippetSection = container.createEl("details");
+      snippetSection.createEl("summary", {
+        text: "Quick Look snippets",
+      });
+      snippetSection.createEl("p", {
+        text: "Selected CSS files are added in name order after the source styles. Follow this vault also keeps its enabled snippets; these toggles do not disable them. Fixed theme uses only snippets selected here. Changes apply on the next sync.",
+      });
+      for (const name of [
+        ...new Set([...choices.snippets, ...plugin.selection.snippets]),
+      ].sort()) {
+        new Setting(snippetSection)
+          .setName(name + (choices.snippets.includes(name) ? "" : " (missing)"))
+          .addToggle((toggle) =>
+            toggle
+              .setValue(plugin.selection.snippets.includes(name))
+              .onChange((enabled) =>
+                change({
+                  snippets: enabled
+                    ? [...plugin.selection.snippets, name]
+                    : plugin.selection.snippets.filter((item) => item !== name),
+                }),
+              ),
+          );
+      }
+      new Setting(container).addButton((button) =>
+        button
+          .setButtonText("Refresh installed files")
+          .onClick(() => this.showSources()),
+      );
+    } catch (error) {
+      container.createEl("p", {
+        text: `Appearance files unavailable: ${error.message}`,
+      });
+    }
   }
   update() {
     if (!this.previews?.isConnected) return;
@@ -478,6 +619,7 @@ class QuickCssSettingsTab extends PluginSettingTab {
     }
   }
   hide() {
+    this.sourceGeneration = (this.sourceGeneration || 0) + 1;
     this.previewController?.abort();
     this.generation++;
     for (const cleanup of this.cleanups) cleanup();

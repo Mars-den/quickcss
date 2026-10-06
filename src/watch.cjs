@@ -128,6 +128,37 @@ class CacheWatcher {
     this.options.error?.(error);
   }
 
+  fingerprint() {
+    // macOS may deliver duplicate or directory-only notifications long after
+    // registration. Compare relevant resource identity, not directory mtime.
+    const identify = (file) => {
+      try {
+        const stat = fs.statSync(file);
+        return [
+          stat.dev,
+          stat.ino,
+          stat.isDirectory() ? null : stat.mtimeMs,
+          stat.isDirectory() ? null : stat.ctimeMs,
+          stat.isDirectory() ? null : stat.size,
+        ];
+      } catch (error) {
+        return error.code;
+      }
+    };
+    const current = path.join(this.cache.root, "current");
+    return JSON.stringify([
+      ...[
+        this.cache.root,
+        this.cache.stateRoot,
+        current,
+        this.cache.stateFile,
+      ].map(identify),
+      ...["quicklook.css", "quicklook.js", "index.html"].map((file) =>
+        identify(path.join(current, file)),
+      ),
+    ]);
+  }
+
   schedule() {
     if (this.closed) return;
     clearTimeout(this.timer);
@@ -135,6 +166,9 @@ class CacheWatcher {
       this.timer = null;
       if (this.closed) return;
       this.refresh();
+      const fingerprint = this.fingerprint();
+      if (fingerprint === this.lastFingerprint) return;
+      this.lastFingerprint = fingerprint;
       this.options.change();
     }, this.options.delay ?? 100);
     this.timer.unref?.();

@@ -235,26 +235,48 @@ class Cache {
         previousState.label === label &&
         previousState.version === version
       )
-        return this.writeCurrent(snapshot.css);
-      atomic(
-        this.stateFile,
-        JSON.stringify(
-          {
-            schema: 2,
-            owner: ownerId || previousState.owner,
-            enabled: true,
-            snapshot,
-            css: snapshot.css,
-            label,
-            version,
-            appliedAt: new Date().toISOString(),
-          },
-          null,
-          2,
-        ),
-      );
-      return this.writeCurrent(snapshot.css);
+        return this.commitCurrent(previousState);
+      const requested = {
+        schema: 2,
+        owner: ownerId || previousState.owner,
+        enabled: true,
+        snapshot,
+        css: snapshot.css,
+        label,
+        version,
+        application: "pending",
+        requestedAt: new Date().toISOString(),
+      };
+      atomic(this.stateFile, JSON.stringify(requested, null, 2));
+      return this.commitCurrent(requested);
     });
+  }
+  commitCurrent(state) {
+    // Persist intent first so a crash or partial write can be retried by the owner.
+    // appliedAt describes this request only after the resource write succeeds.
+    try {
+      const result = this.writeCurrent(state.css);
+      const applied = {
+        ...state,
+        application: "applied",
+        appliedAt: new Date().toISOString(),
+        appliedCache: result.cache,
+      };
+      delete applied.applicationError;
+      atomic(this.stateFile, JSON.stringify(applied, null, 2));
+      return result;
+    } catch (error) {
+      const failed = {
+        ...state,
+        application: "failed",
+        applicationError: error.message,
+      };
+      delete failed.appliedAt;
+      delete failed.appliedCache;
+      if (JSON.stringify(this.state()) !== JSON.stringify(failed))
+        atomic(this.stateFile, JSON.stringify(failed, null, 2));
+      throw error;
+    }
   }
   claim(ownerId, label, force = false) {
     return this.locked(() => {
@@ -276,17 +298,23 @@ class Cache {
     const previousState = this.state();
     if (!previousState.enabled) return { enabled: false };
     if (ownerId && previousState.owner !== ownerId) return { skipped: true };
-    const current = this.current();
-    // Our own writes trigger filesystem notifications too. Checking before
-    // locking avoids both lock churn and an event/write feedback loop.
-    if (patch(current.source, previousState.css) === current.source)
-      return { changed: false, enabled: true };
+    // Our own writes trigger filesystem notifications too. Check before
+    // locking to avoid churn; failed validation is retried under the lock so
+    // commitCurrent records failure for followers as well as the owner.
+    try {
+      const current = this.current();
+      if (
+        patch(current.source, previousState.css) === current.source &&
+        (!previousState.application || previousState.application === "applied")
+      )
+        return { changed: false, enabled: true };
+    } catch {}
     return this.locked(() => {
       const sharedState = this.state();
       if (!sharedState.enabled) return { enabled: false };
       if (ownerId && sharedState.owner !== ownerId) return { skipped: true };
       return {
-        ...this.writeCurrent(sharedState.css),
+        ...this.commitCurrent(sharedState),
         enabled: true,
         label: sharedState.label,
         version: sharedState.version,

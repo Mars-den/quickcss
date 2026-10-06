@@ -251,3 +251,31 @@ test("cancelling an iframe evaluation removes it immediately and rejects before 
   );
   assert.equal(appended, 1);
 });
+
+test("context capture separates heading and callout emphasis and gives nested lists sufficient specificity", () => {
+  const { CONTEXT_TARGETS, SAMPLE } = require("../src/capture.cjs");
+  assert.match(SAMPLE, /<h1>[^<]+<strong>/);
+  assert.match(SAMPLE, /A deeper item/);
+  for (const level of [1, 2, 3, 4, 5, 6])
+    for (const tag of ["strong", "em"])
+      assert.ok(
+        CONTEXT_TARGETS.some(
+          ([selector]) => selector === `.markdown-rendered h${level} ${tag}`,
+        ),
+      );
+  for (const tag of ["strong", "em"])
+    assert.ok(
+      CONTEXT_TARGETS.some(
+        ([selector]) =>
+          selector ===
+          `.markdown-rendered .callout[data-callout="note"] .callout-content ${tag}`,
+      ),
+    );
+  assert.ok(
+    CONTEXT_TARGETS.some(
+      ([selector]) =>
+        selector ===
+        ".markdown-rendered ul:not(.contains-task-list) ul:not(.contains-task-list) ul:not(.contains-task-list)",
+    ),
+  );
+});

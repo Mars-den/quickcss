@@ -284,3 +284,73 @@ test("ownership changes between reconciliation and lock acquisition prevent stal
   assert.equal(cache.reconcile("A").skipped, true);
   assert.equal(fs.readFileSync(file, "utf8"), bytes);
 });
+
+test("failed resource writes retain requested appearance without claiming success and owner retries", (t) => {
+  const { cache, base, generation } = fixture(t);
+  const file = generation("a");
+  cache.claim("A", "A");
+  cache.applySnapshot(snapshot, "old", "1", "A");
+  const write = cache.writeCurrent.bind(cache);
+  cache.writeCurrent = () => {
+    throw Error("synthetic resource failure");
+  };
+  const next = { ...snapshot, css: "body{color:purple}" };
+  assert.throws(() => cache.applySnapshot(next, "new", "1", "A"), /synthetic/);
+  assert.equal(cache.state().application, "failed");
+  assert.equal(cache.state().snapshot.css, next.css);
+  assert.equal(cache.state().appliedAt, undefined);
+  assert.match(cache.state().applicationError, /synthetic/);
+  assert.match(fs.readFileSync(file, "utf8"), /font-size:16px/);
+  assert.equal(cache.reconcile("B").skipped, true);
+  cache.writeCurrent = write;
+  assert.equal(cache.reconcile("A").changed, true);
+  assert.equal(cache.state().application, "applied");
+  assert.ok(cache.state().appliedAt);
+  assert.equal(cache.state().applicationError, undefined);
+  assert.equal(cache.restore("A"), 1);
+  assert.equal(fs.readFileSync(file, "utf8"), base);
+});
+
+test("resource success followed by profile commit failure remains retryable without rewriting CSS", (t) => {
+  const { cache, generation } = fixture(t);
+  const file = generation("a");
+  const write = cache.writeCurrent.bind(cache);
+  let renames = 0;
+  const rename = fs.renameSync;
+  t.after(() => {
+    fs.renameSync = rename;
+  });
+  fs.renameSync = (from, to) => {
+    if (to === cache.stateFile && ++renames === 2)
+      throw Error("profile commit failure");
+    return rename(from, to);
+  };
+  assert.throws(
+    () => cache.applySnapshot(snapshot, "A", "1"),
+    /profile commit/,
+  );
+  assert.equal(cache.state().application, "failed");
+  assert.equal(cache.state().appliedAt, undefined);
+  assert.match(fs.readFileSync(file, "utf8"), /quickcss:begin/);
+  const mtime = fs.statSync(file).mtimeMs;
+  cache.writeCurrent = write;
+  assert.equal(cache.reconcile().changed, false);
+  assert.equal(cache.state().application, "applied");
+  assert.equal(fs.statSync(file).mtimeMs, mtime);
+});
+
+test("invalid replacement resources report failure to followers without repeated profile-write churn", (t) => {
+  const { cache, generation } = fixture(t);
+  generation("a");
+  cache.claim("A", "A");
+  cache.applySnapshot(snapshot, "A", "1", "A");
+  const file = generation("b");
+  fs.writeFileSync(file, "unsupported renderer");
+  assert.throws(() => cache.reconcile("A"), /Unsupported/);
+  assert.equal(cache.state().application, "failed");
+  assert.equal(cache.state().appliedAt, undefined);
+  const mtime = fs.statSync(cache.stateFile).mtimeMs;
+  assert.throws(() => cache.reconcile("A"), /Unsupported/);
+  assert.equal(fs.statSync(cache.stateFile).mtimeMs, mtime);
+  assert.equal(cache.reconcile("B").skipped, true);
+});

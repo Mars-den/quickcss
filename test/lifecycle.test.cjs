@@ -410,3 +410,38 @@ test("cache notifications repair styling in the owner while followers never reco
   assert.equal(captures, 0, "cache changes must not recapture the theme");
   assert.match(follower.status, /following another vault/);
 });
+
+test("fixed selection persists through pause, quit and restart without taking over another vault", async (t) => {
+  const { instance, file } = setup(t);
+  const owner = instance("A");
+  await owner.onload();
+  owner.layout();
+  owner.sync.cancel();
+  owner.captureCurrent = async () => snapshot;
+  await owner.syncNow();
+  const follower = instance("B");
+  await follower.onload();
+  follower.layout();
+  await follower.setAppearance({
+    source: "fixed",
+    theme: "Test",
+    snippets: ["extra"],
+  });
+  assert.equal(follower.owns(), false);
+  assert.equal(follower.sync.timer, null);
+  await follower.setAutomatic(false);
+  const bytes = fs.readFileSync(file, "utf8");
+  follower.beginShutdown();
+  follower.onunload();
+  const restarted = instance("B", follower.saved);
+  await restarted.onload();
+  restarted.layout();
+  assert.deepEqual(restarted.selection, {
+    source: "fixed",
+    theme: "Test",
+    snippets: ["extra"],
+  });
+  assert.equal(restarted.autoSync, false);
+  assert.equal(restarted.owns(), false);
+  assert.equal(fs.readFileSync(file, "utf8"), bytes);
+});
