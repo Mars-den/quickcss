@@ -1,6 +1,6 @@
 {
   "name": "quickcss",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "private": true,
   "description": "Obsidian theme and CSS styling for macOS Quick Look Markdown previews in Finder",
   "scripts": {
