@@ -1,93 +1,80 @@
 # QuickCss
 
-Make macOS Quick Look Markdown previews in Finder look like your Obsidian notes.
+Your notes look the way you want in Obsidian. They should feel familiar when you preview them in Finder, too.
 
-QuickCss brings your reading fonts, colors, headings, tables, code blocks, quotations, tasks, and common callouts to macOS Quick Look. It follows your active theme, enabled CSS snippets, and Style Settings choices automatically. There are no extra appearance sliders to configure.
+QuickCss brings your theme, CSS snippets, and Style Settings choices to macOS Quick Look. Fonts, colors, headings, tables, code blocks, quotations, task checkboxes, and common callouts follow your reading appearance automatically. Change your theme and QuickCss picks it up—no second set of appearance sliders to maintain.
 
-Quick Look (also called QuickLook) is the preview opened by pressing **Space** in Finder. QuickCss automatically syncs your Markdown preview styling from Obsidian.
+## Before you install
 
-## Requirements
+Obsidian added Markdown Quick Look previews in [version 1.14](https://obsidian.md/changelog/2026-10-05-desktop-v1.14.0/). **You need a recent installer**, not just an in-app update. If you've been updating the same installation for a while, [download Obsidian again](https://obsidian.md/download) and reinstall it to get the native extension.
 
-- macOS with Obsidian 1.14.4 or later.
-- Obsidian’s native Markdown Quick Look extension installed and working.
-- Style Settings is optional. QuickCss uses its choices when the plugin is present.
+You'll need macOS and Obsidian **1.14.4 or later**. Before installing QuickCss, select a Markdown file in Finder and press **Space**. Obsidian's Markdown preview should already work. QuickCss styles that preview; it doesn't install the extension itself.
 
-QuickCss is available from [GitHub releases](https://github.com/Mars-den/quickcss/releases). Community directory availability depends on review.
+Style Settings is optional. If you use it, QuickCss follows its choices along with your enabled snippets and current theme.
 
 ## Install
 
 1. Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/Mars-den/quickcss/releases/latest).
-2. Create a `quickcss` folder inside your vault’s plugin folder, usually `.obsidian/plugins/quickcss`.
-3. Copy `main.js`, `manifest.json`, and `styles.css` into it.
+2. Create a `quickcss` folder in your vault's `.obsidian/plugins` folder.
+3. Put the three files inside it.
 4. Restart Obsidian and enable **QuickCss** in **Settings → Community plugins**.
 
-If you use a custom Obsidian configuration folder, place QuickCss in that folder’s `plugins` directory instead.
+If your vault uses a custom configuration folder, use its `plugins` folder instead.
 
-## Use
+## Try it out
 
-Once enabled, QuickCss captures your reading appearance and keeps it up to date as you change your theme, snippets, or Style Settings.
+Once enabled, QuickCss captures your reading appearance and keeps it in sync. Select a Markdown file in Finder, press **Space**, and take a look.
 
-Select a Markdown file in Finder and press **Space** to open Quick Look. Close and reopen the preview after an appearance change. Open **Settings → QuickCss** to see sample light and dark previews and sync status.
+Open **Settings → QuickCss** for sample light and dark previews. They use your **text font**; the **interface font** is a separate setting for Obsidian's menus and settings.
 
-The previews use your **text font**. Your **interface font** controls Obsidian’s settings and other interface text separately.
+Already have a Quick Look window open? Close it and open it again after changing your appearance. Existing previews can hang onto the old styling.
 
-### Controls
-
-| Control | What it does |
+| Control | When to use it |
 | --- | --- |
-| Automatic sync | Keeps Quick Look styling up to date with this vault’s appearance. Turning it off leaves the last applied appearance in place. |
-| Sync now / use this vault | Refreshes the appearance immediately and makes this vault the source for Quick Look styling. |
-| Restore and pause | Removes QuickCss styling and stops automatic sync. |
+| Automatic sync | Leave this on to follow theme, snippet, and Style Settings changes. Turning it off keeps the last applied appearance. |
+| Sync now / use this vault | Refresh immediately, or switch which vault supplies the appearance. |
+| Restore and pause | Go back to the native preview and stop syncing. |
 
-### If you use several vaults
+### A note about multiple vaults
 
-Quick Look styling is shared across your macOS user account. One vault supplies the appearance; other vaults follow it. Choose **Sync now / use this vault** to switch the source.
+Quick Look belongs to your Mac, so all your vaults share one preview appearance. One vault supplies the styling at a time. Choose **Sync now / use this vault** when you want another vault's look instead.
 
-Disabling QuickCss in the source vault removes its styling. Disabling it in another vault leaves the source vault’s styling alone. Closing Obsidian normally keeps the last applied appearance available in Finder.
+Disabling QuickCss in the source vault restores the native styling. Disabling it in a following vault leaves the source's styling alone. Closing Obsidian normally keeps your last appearance available in Finder.
 
-## What to expect
+## A few things to know
 
-QuickCss aims to match Obsidian’s reading appearance, but Quick Look uses a different renderer. Text rendering and some layout details can differ.
+Quick Look and Obsidian use different renderers, so some text and layout details may differ. Fonts installed on your Mac work best; fonts supplied only through a theme or a download may fall back.
 
-- Locally available fonts work; fonts available only through theme files or downloads may fall back.
-- Editor styling, plugin widgets, note-specific CSS classes, interactive effects, and unusual callouts are not fully supported.
-- External images and font assets are not copied. Simple inline SVG task checkmarks can be captured.
-- The settings previews use sample content and may differ slightly from the actual native preview.
+Editor styling, plugin widgets, note-specific CSS classes, interactive effects, and unusual callouts aren't fully supported. External images and font assets aren't copied. Simple inline SVG checkbox marks can be captured.
 
-QuickCss uses Obsidian’s **undocumented Quick Look cache**. Obsidian or macOS updates may change how it works. This plugin is an independent project and is not an official Obsidian feature.
+QuickCss works through Obsidian's **undocumented Quick Look cache**, so an Obsidian or macOS update could change how it works. This is an independent plugin.
 
-## Troubleshooting
+## Something looks wrong?
 
-**Quick Look still shows the old appearance**
+**No Markdown preview in Finder?** Download and reinstall the latest Obsidian installer first. If another app handles Markdown previews on your Mac, make sure you're seeing Obsidian's native preview.
 
-Close the preview, choose **Sync now / use this vault**, and reopen it. Finder may retain a cached preview; test a newly created Markdown file if necessary.
+**Still seeing the old appearance?** Choose **Sync now / use this vault**, then close and reopen Quick Look. Finder sometimes caches previews; try a newly created Markdown file if it keeps showing the old one.
 
-**Another vault’s theme appears**
+**Seeing another vault's theme?** Open the vault you want and choose **Sync now / use this vault**.
 
-Open QuickCss settings in the vault you want to use and choose **Sync now / use this vault**.
+**Wrong font?** Check your text/reading font in Obsidian or Style Settings, rather than the interface font. Try a font installed on your Mac.
 
-**The font looks different**
-
-Check your reading/text font in Obsidian or Style Settings, rather than the interface font. Use a font installed on your Mac if the chosen font is supplied only by a theme.
-
-**Sync reports missing or unsupported Quick Look resources**
-
-Check that a Markdown file opens with Obsidian’s native Quick Look extension. QuickCss styles that extension; it does not install it or replace another Markdown preview app.
-
-**You want the original appearance back**
-
-Choose **Restore and pause**, or disable QuickCss in the source vault. Close and reopen Quick Look afterward.
+**Want to undo it?** Choose **Restore and pause**, or disable QuickCss in the source vault. Reopen Quick Look afterward.
 
 ## Privacy and file access
 
-QuickCss works locally. It has no telemetry, network requests, account requirement, or advertising. It reads loaded appearance styles and settings, evaluates them against sample Markdown, and saves the resulting appearance. It does not read or edit your notes.
+Everything happens locally. QuickCss has no telemetry, network requests, account requirement, or advertising. It reads appearance styles and settings, checks them against sample Markdown, and saves the resulting styling. **It does not read or edit your notes.**
 
-To style Finder previews, it accesses files outside your vault:
+Finder previews live outside your vault, so QuickCss accesses:
 
-- `~/Library/Application Support/obsidian/quicklook/` — adds a removable CSS block to Obsidian’s native Quick Look cache.
-- `~/Library/Application Support/QuickCss/` — stores the shared appearance, source-vault label, and original CSS backups.
+- `~/Library/Application Support/obsidian/quicklook/` to add a removable CSS block to the native Quick Look cache.
+- `~/Library/Application Support/QuickCss/` to keep the shared appearance, source-vault label, and original CSS backups.
 
-Restoration removes QuickCss’s own block and preserves unrelated CSS. The signed Obsidian application bundle is not modified, and no background service runs when Obsidian is closed.
+Restoration removes QuickCss's own block and keeps unrelated CSS. It doesn't modify the signed Obsidian application bundle or run a background service after Obsidian closes.
+
+## Bugs and ideas
+
+[Open an issue](https://github.com/Mars-den/quickcss/issues). For a styling mismatch, a small example note and screenshots of the two previews help. Please use sample content rather than private notes.
 
 ## Build from source
 
@@ -97,7 +84,7 @@ npm test
 npm run build
 ```
 
-Install the generated `main.js` with `manifest.json` and `styles.css` using the steps above.
+Install the generated `main.js` with `manifest.json` and `styles.css`. Releases are built in GitHub Actions with artifact attestations for the three files.
 
 ## License
 
