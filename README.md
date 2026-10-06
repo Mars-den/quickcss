@@ -6,7 +6,7 @@ QuickCss brings your theme, CSS snippets, and Style Settings choices to macOS Qu
 
 ## Before you install
 
-Obsidian added Markdown Quick Look previews in [version 1.14](https://obsidian.md/changelog/2026-10-05-desktop-v1.14.0/). **You need a recent installer**, not just an in-app update. If you've been updating the same installation for a while, [download Obsidian again](https://obsidian.md/download) and reinstall it to get the native extension.
+Obsidian added Markdown Quick Look previews in [version 1.14](https://obsidian.md/changelog/2026-10-05-desktop-v1.14.4/). **You need a recent installer**, not just an in-app update. If you've been updating the same installation for a while, [download Obsidian again](https://obsidian.md/download) and reinstall it to get the native extension.
 
 You'll need macOS and Obsidian **1.14.4 or later**. Before installing QuickCss, select a Markdown file in Finder and press **Space**. Obsidian's Markdown preview should already work. QuickCss styles that preview; it doesn't install the extension itself.
 
