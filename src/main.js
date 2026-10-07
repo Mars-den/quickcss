@@ -403,26 +403,110 @@ module.exports = class QuickCss extends Plugin {
     }
   }
 };
+const TABS = [
+  { id: "overview", name: "Overview" },
+  { id: "appearance", name: "Appearance" },
+  { id: "preview", name: "Preview" },
+  { id: "help", name: "Help" },
+];
+const HELP = [
+  [
+    "Sharing between vaults",
+    "One vault owns the appearance across macOS. Other vaults follow it until you choose Sync now in one of them.",
+  ],
+  [
+    "Fixed theme",
+    "Pick Fixed theme in Appearance to keep Quick Look on one theme. Obsidian’s own theme, fonts, and Style Settings no longer change it, so theme features that rely on them may look different.",
+  ],
+  [
+    "Seeing the old appearance",
+    "Close and reopen Quick Look after a change. Finder sometimes caches previews; a newly created Markdown file shows the latest styling.",
+  ],
+  [
+    "Fonts",
+    "Quick Look uses your text font, not the interface font. Fonts installed on your Mac work best.",
+  ],
+  [
+    "Undoing QuickCss",
+    "Restore and pause, or disable QuickCss in the vault that owns the appearance. The appearance is kept when Obsidian closes normally.",
+  ],
+  [
+    "Missed changes",
+    "Appearance changes are detected through Obsidian events. If another plugin changes styling without notifying Obsidian, choose Sync now.",
+  ],
+];
 class QuickCssSettingsTab extends PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
     this.generation = 0;
     this.cleanups = [];
+    this.selected = "overview";
+    this.mode = "light";
   }
   display() {
     this.hide();
-    const plugin = this.plugin,
-      container = this.containerEl;
+    const container = this.containerEl;
     container.empty();
-    container.createEl("p", {
-      text: "Choose a vault appearance or a fixed theme for native macOS Quick Look.",
+    const tabList = container.createDiv({
+      cls: "quickcss-tabs",
+      attr: { role: "tablist", "aria-label": "QuickCss settings" },
     });
-    this.status = container.createEl("p", {
-      cls: "quickcss-status",
-      text: plugin.status,
-    });
-    new Setting(container)
+    this.tabs = new Map();
+    this.panels = new Map();
+    for (const { id, name } of TABS) {
+      const tab = tabList.createEl("button", {
+        cls: "quickcss-tab",
+        text: name,
+        attr: {
+          type: "button",
+          role: "tab",
+          id: `quickcss-tab-${id}`,
+          "aria-controls": `quickcss-panel-${id}`,
+        },
+      });
+      tab.addEventListener("click", () => this.select(id));
+      tab.addEventListener("keydown", (event) => this.moveFocus(event, id));
+      this.tabs.set(id, tab);
+      this.panels.set(
+        id,
+        container.createDiv({
+          cls: "quickcss-panel",
+          attr: {
+            role: "tabpanel",
+            id: `quickcss-panel-${id}`,
+            "aria-labelledby": `quickcss-tab-${id}`,
+            tabindex: "0",
+          },
+        }),
+      );
+    }
+    this.showOverview(this.panels.get("overview"));
+    this.sources = this.panels.get("appearance");
+    this.showSources();
+    this.showPreviewPanel(this.panels.get("preview"));
+    this.showHelp(this.panels.get("help"));
+    this.rendered = undefined;
+    this.select(this.selected);
+  }
+  showOverview(panel) {
+    const plugin = this.plugin;
+    this.statusSetting = new Setting(panel)
+      .setClass("quickcss-status")
+      .addButton((button) =>
+        button
+          .setButtonText("Sync now")
+          .setCta()
+          .setTooltip(
+            "Also makes this vault the owner of the shared appearance",
+          )
+          .onClick(async () => {
+            button.setDisabled(true);
+            await plugin.syncNow();
+            button.setDisabled(false);
+          }),
+      );
+    new Setting(panel)
       .setName("Automatic sync")
       .setDesc(
         "Keep Quick Look up to date with the selected source and snippet files.",
@@ -439,37 +523,45 @@ class QuickCssSettingsTab extends PluginSettingTab {
               ),
           ),
       );
-    new Setting(container)
-      .setName("Current appearance")
+    new Setting(panel)
+      .setName("Restore native appearance")
       .setDesc(
-        "Sync now also makes this vault the owner of the shared macOS appearance.",
-      )
-      .addButton((button) =>
-        button.setButtonText("Sync now / use this vault").onClick(async () => {
-          button.setDisabled(true);
-          await plugin.syncNow();
-          button.setDisabled(false);
-        }),
-      );
-    new Setting(container)
-      .setName("Native appearance")
-      .setDesc(
-        "Restore and pause sync. Disabling QuickCss also restores styling owned by this vault.",
+        "Remove QuickCss styling from Quick Look and pause automatic sync.",
       )
       .addButton((button) =>
         button
           .setButtonText("Restore and pause")
+          .setWarning()
           .onClick(() => plugin.restore()),
       );
-    container.createEl("p", {
-      text: "One vault owns automatic sync across macOS. Other vaults follow it until you choose “use this vault”. Existing Quick Look panels may need reopening to refresh. Appearance is retained when Obsidian closes normally.",
+  }
+  showPreviewPanel(panel) {
+    const controls = new Setting(panel)
+      .setName("Appearance")
+      .setDesc(
+        "Previews use your text font. The interface font only affects Obsidian's menus and settings.",
+      );
+    const group = controls.controlEl.createDiv({
+      cls: "quickcss-segmented",
+      attr: { role: "group", "aria-label": "Preview appearance" },
     });
-    this.sources = container.createDiv();
-    this.showSources();
-    this.details = container.createEl("p");
-    this.previews = container.createDiv({ cls: "quickcss-previews" });
-    this.rendered = null;
-    this.update();
+    this.modeButtons = new Map();
+    for (const mode of ["light", "dark"]) {
+      const button = group.createEl("button", {
+        text: mode === "light" ? "Light" : "Dark",
+        attr: { type: "button" },
+      });
+      button.addEventListener("click", () => {
+        this.mode = mode;
+        this.update();
+      });
+      this.modeButtons.set(mode, button);
+    }
+    this.previews = panel.createDiv({ cls: "quickcss-preview" });
+  }
+  showHelp(panel) {
+    for (const [name, description] of HELP)
+      new Setting(panel).setName(name).setDesc(description);
   }
   async showSources() {
     const generation = (this.sourceGeneration =
@@ -523,17 +615,30 @@ class QuickCssSettingsTab extends PluginSettingTab {
             .onChange((theme) => change({ theme }));
         });
       }
-      const snippetSection = container.createEl("details");
-      snippetSection.createEl("summary", {
-        text: "Quick Look snippets",
-      });
-      snippetSection.createEl("p", {
-        text: "Selected CSS files are added in name order after the source styles. Follow this vault also keeps its enabled snippets; these toggles do not disable them. Fixed theme uses only snippets selected here. Changes apply on the next sync.",
-      });
-      for (const name of [
+      new Setting(container)
+        .setName("Quick Look snippets")
+        .setDesc(
+          plugin.selection.source === "fixed"
+            ? "Only snippets selected here are added after the theme, in name order. Changes apply on the next sync."
+            : "Selected files are added after this vault’s enabled snippets; these toggles can’t disable them. Changes apply on the next sync.",
+        )
+        .setHeading()
+        .addExtraButton((button) =>
+          button
+            .setIcon("refresh-cw")
+            .setTooltip("Refresh installed files")
+            .onClick(() => this.showSources()),
+        );
+      const names = [
         ...new Set([...choices.snippets, ...plugin.selection.snippets]),
-      ].sort()) {
-        new Setting(snippetSection)
+      ].sort();
+      if (!names.length)
+        container.createEl("p", {
+          cls: "setting-item-description",
+          text: "No .css files in the snippets folder.",
+        });
+      for (const name of names) {
+        new Setting(container)
           .setName(name + (choices.snippets.includes(name) ? "" : " (missing)"))
           .addToggle((toggle) =>
             toggle
@@ -547,23 +652,54 @@ class QuickCssSettingsTab extends PluginSettingTab {
               ),
           );
       }
-      new Setting(container).addButton((button) =>
-        button
-          .setButtonText("Refresh installed files")
-          .onClick(() => this.showSources()),
-      );
     } catch (error) {
       container.createEl("p", {
         text: `Appearance files unavailable: ${error.message}`,
       });
     }
   }
+  select(id, focus = false) {
+    this.selected = id;
+    for (const [tabId, tab] of this.tabs) {
+      const active = tabId === id;
+      tab.setAttribute("aria-selected", String(active));
+      tab.tabIndex = active ? 0 : -1;
+      tab.toggleClass("is-active", active);
+      this.panels.get(tabId).hidden = !active;
+    }
+    if (focus) this.tabs.get(id).focus();
+    this.update();
+  }
+  moveFocus(event, id) {
+    const index = TABS.findIndex((tab) => tab.id === id);
+    const next = {
+      ArrowRight: index + 1,
+      ArrowLeft: index - 1,
+      Home: 0,
+      End: TABS.length - 1,
+    }[event.key];
+    if (next === undefined) return;
+    event.preventDefault();
+    this.select(TABS[(next + TABS.length) % TABS.length].id, true);
+  }
   update() {
     if (!this.previews?.isConnected) return;
-    this.status.setText(this.plugin.status);
     const snapshot = this.plugin.snapshot;
-    if (snapshot === this.rendered) return;
+    this.statusSetting.setName(this.plugin.status);
+    this.statusSetting.setDesc(
+      snapshot
+        ? `${snapshot.theme} · ${snapshot.snippets.length} snippet(s) · Style Settings ${snapshot.styleSettings ? "included" : "not detected"}${snapshot.skippedStylesheets ? ` · ${snapshot.skippedStylesheets} stylesheet(s) skipped` : ""}`
+        : "Waiting for the first automatic capture.",
+    );
+    for (const [mode, button] of this.modeButtons) {
+      button.setAttribute("aria-pressed", String(mode === this.mode));
+      button.toggleClass("is-active", mode === this.mode);
+    }
+    // Previews render only while visible; a hidden tab catches up when selected.
+    if (this.selected !== "preview") return;
+    if (snapshot === this.rendered && this.mode === this.renderedMode) return;
     this.rendered = snapshot;
+    this.renderedMode = this.mode;
     this.showSnapshot();
   }
   async showSnapshot() {
@@ -571,51 +707,42 @@ class QuickCssSettingsTab extends PluginSettingTab {
     const controller = new AbortController();
     this.previewController = controller;
     const snapshot = this.plugin.snapshot,
+      mode = this.mode,
       container = this.previews,
       generation = ++this.generation;
     for (const cleanup of this.cleanups) cleanup();
     this.cleanups = [];
     container.empty();
     if (!snapshot) {
-      this.details.setText(
-        "Preview will appear after the first automatic capture.",
-      );
+      container.createEl("p", {
+        cls: "setting-item-description",
+        text: "Preview will appear after the first automatic capture.",
+      });
       return;
     }
-    this.details.setText(
-      `${snapshot.theme} · ${snapshot.snippets.length} snippet(s) · Style Settings ${snapshot.styleSettings ? "included" : "not detected"}${snapshot.skippedStylesheets ? ` · ${snapshot.skippedStylesheets} stylesheet(s) skipped` : ""}`,
-    );
     let baseCSS = "";
     try {
       baseCSS = strip(this.plugin.cache.current().source);
     } catch {}
-    for (const mode of ["light", "dark"]) {
-      try {
-        const card = container.createDiv({ cls: "quickcss-preview-card" });
-        card.createEl("h3", {
-          text: mode === "light" ? "Light preview" : "Dark preview",
-        });
-        const element = await frame(
-          document,
-          mode,
-          [],
-          baseCSS + "\n" + snapshot.css,
-          card,
-          {
-            signal: controller.signal,
-          },
-        );
-        if (generation !== this.generation || !container.isConnected) {
-          element.remove();
-          return;
-        }
-        this.cleanups.push(preparePreview(element, mode, container));
-      } catch (error) {
-        if (controller.signal.aborted || generation !== this.generation) return;
-        container.createEl("p", {
-          text: `Preview unavailable: ${error.message}`,
-        });
+    try {
+      const element = await frame(
+        document,
+        mode,
+        [],
+        baseCSS + "\n" + snapshot.css,
+        container,
+        { signal: controller.signal },
+      );
+      if (generation !== this.generation || !container.isConnected) {
+        element.remove();
+        return;
       }
+      this.cleanups.push(preparePreview(element, mode, container));
+    } catch (error) {
+      if (controller.signal.aborted || generation !== this.generation) return;
+      container.createEl("p", {
+        text: `Preview unavailable: ${error.message}`,
+      });
     }
   }
   hide() {
@@ -624,5 +751,6 @@ class QuickCssSettingsTab extends PluginSettingTab {
     this.generation++;
     for (const cleanup of this.cleanups) cleanup();
     this.cleanups = [];
+    this.rendered = undefined;
   }
 }

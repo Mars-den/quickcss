@@ -64,21 +64,21 @@ If your vault uses a custom configuration folder, use its `plugins` folder inste
 
 Once enabled, QuickCss follows this vault’s reading appearance and keeps it in sync. Existing users keep this behavior. Select a Markdown file in Finder, press **Space**, and take a look.
 
-Open **Settings → QuickCss** for sample light and dark previews. They use your **text font**; the **interface font** is a separate setting for Obsidian's menus and settings.
+Open **Settings → QuickCss**. **Overview** has the sync controls, **Appearance** chooses between following this vault and a fixed theme, **Preview** shows a sample note in light or dark, and **Help** covers vault sharing and troubleshooting. Previews use your **text font**; the **interface font** is a separate setting for Obsidian's menus and settings.
 
-Appearance changes are detected through Obsidian events and style changes. If another plugin changes styling without notifying Obsidian, choose **Sync now / use this vault** to refresh it.
+Appearance changes are detected through Obsidian events and style changes. If another plugin changes styling without notifying Obsidian, choose **Sync now** to refresh it.
 
 Already have a Quick Look window open? Close it and open it again after changing your appearance. Existing previews can hang onto the old styling.
 
 | Control | When to use it |
 | --- | --- |
 | Automatic sync | Leave this on to keep the selected source and snippet files up to date. Turning it off keeps the last applied appearance. |
-| Sync now / use this vault | Refresh immediately, or switch which vault supplies the appearance. |
+| Sync now | Refresh immediately, or switch which vault supplies the appearance. |
 | Restore and pause | Go back to the native preview and stop syncing. |
 
 ### Choose an appearance
 
-**Appearance source → Follow this vault** captures the active theme, enabled snippets, and Style Settings as before. **Fixed theme** chooses Default or a theme installed in this vault’s configuration folder. It leaves Obsidian’s own theme untouched and evaluates both light and dark modes using native Quick Look reading defaults. Changes to Obsidian’s active theme, body classes, fonts, or Style Settings do not change that fixed appearance. Theme features that require plugin classes or Style Settings may therefore differ from their appearance in Obsidian.
+**Appearance → Appearance source → Follow this vault** captures the active theme, enabled snippets, and Style Settings as before. **Fixed theme** chooses Default or a theme installed in this vault’s configuration folder. It leaves Obsidian’s own theme untouched and evaluates both light and dark modes using native Quick Look reading defaults. Changes to Obsidian’s active theme, body classes, fonts, or Style Settings do not change that fixed appearance. Theme features that require plugin classes or Style Settings may therefore differ from their appearance in Obsidian.
 
 The compact **Quick Look snippets** list reads existing `.css` files from your configuration folder’s `snippets` directory. Create or edit those files with your usual editor, then refresh the installed-file list if necessary. QuickCss does not change Obsidian’s snippet toggles.
 
@@ -91,11 +91,11 @@ A saved appearance and a successful cache write are tracked separately. Failed w
 
 ### A note about multiple vaults
 
-Quick Look belongs to your Mac, so all your vaults share one preview appearance. One vault supplies the styling at a time. Choose **Sync now / use this vault** when you want another vault's look instead.
+Quick Look belongs to your Mac, so all your vaults share one preview appearance. One vault supplies the styling at a time. Choose **Sync now** when you want another vault's look instead.
 
 Disabling QuickCss in the source vault restores the native styling. Disabling it in a following vault leaves the source's styling alone. Closing Obsidian normally keeps your last appearance available in Finder.
 
-QuickCss listens for Quick Look cache changes without a recurring scan. Keep the source vault open so it can reapply your styling if Obsidian replaces the cache. If file monitoring is unavailable, **Sync now / use this vault** retries it and refreshes the styling.
+QuickCss listens for Quick Look cache changes without a recurring scan. Keep the source vault open so it can reapply your styling if Obsidian replaces the cache. If file monitoring is unavailable, **Sync now** retries it and refreshes the styling.
 
 ## A few things to know
 
@@ -109,9 +109,9 @@ QuickCss works through Obsidian's **undocumented Quick Look cache**, so an Obsid
 
 **No Markdown preview in Finder?** Download and reinstall the latest Obsidian installer first. If another app handles Markdown previews on your Mac, make sure you're seeing Obsidian's native preview.
 
-**Still seeing the old appearance?** Choose **Sync now / use this vault**, then close and reopen Quick Look. Finder sometimes caches previews; try a newly created Markdown file if it keeps showing the old one.
+**Still seeing the old appearance?** Choose **Sync now**, then close and reopen Quick Look. Finder sometimes caches previews; try a newly created Markdown file if it keeps showing the old one.
 
-**Seeing another vault's theme?** Open the vault you want and choose **Sync now / use this vault**.
+**Seeing another vault's theme?** Open the vault you want and choose **Sync now**.
 
 **Wrong font?** Check your text/reading font in Obsidian or Style Settings, rather than the interface font. Try a font installed on your Mac.
 

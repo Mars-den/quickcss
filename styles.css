@@ -1,4 +1,11 @@
-.quickcss-status{padding:12px;background:var(--background-secondary);border-radius:8px;}
-.quickcss-previews{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;max-width:1200px;align-items:start;}
-.quickcss-preview-card{min-width:0;}
-@media (max-width:800px){.quickcss-previews{grid-template-columns:1fr;}}
+.quickcss-tabs{display:flex;gap:4px;border-bottom:1px solid var(--background-modifier-border);margin-bottom:12px;}
+.quickcss-tab{background:none;border:none;box-shadow:none;border-radius:0;padding:8px 12px;color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-1px;}
+.quickcss-tab:hover{color:var(--text-normal);background:none;}
+.quickcss-tab.is-active{color:var(--text-normal);border-bottom-color:var(--interactive-accent);font-weight:var(--font-semibold);}
+.quickcss-tab:focus-visible{box-shadow:var(--background-modifier-box-shadow, 0 0 0 2px var(--interactive-accent));}
+.quickcss-panel:focus-visible{outline:none;}
+.quickcss-status{padding:12px 16px;background:var(--background-secondary);border-radius:8px;border-top:none;margin-bottom:8px;}
+.quickcss-segmented{display:inline-flex;border:1px solid var(--background-modifier-border);border-radius:var(--button-radius, 6px);overflow:hidden;}
+.quickcss-segmented button{border:none;border-radius:0;box-shadow:none;background:none;padding:4px 14px;color:var(--text-muted);}
+.quickcss-segmented button.is-active{background:var(--background-modifier-hover);color:var(--text-normal);}
+.quickcss-preview{max-width:900px;margin-top:8px;}
